@@ -83,7 +83,7 @@ STREAMLIT_STYLE = """
 </style>
 """
 
-WARNING_TEXT = "⚠️ Security Alert: Never provide access to sensitive accounts or data, as malicious web content can hijack Claude's behavior"
+WARNING_TEXT = "⚠️ Security Alert: Never provide access to sensitive accounts or data, as malicious web content can hijack Operative's behavior"
 INTERRUPT_TEXT = "(user stopped or interrupted and wrote the following)"
 INTERRUPT_TOOL_ERROR = "human stopped or interrupted tool execution"
 
