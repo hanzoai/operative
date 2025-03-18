@@ -1,6 +1,6 @@
 """
 Agentic sampling loop that calls the Anthropic API using the modern AsyncAnthropic client
-and its streaming response interface.
+and its streaming response interface for beta computer use.
 """
 
 import platform
@@ -26,6 +26,7 @@ from anthropic.types.beta import (
 
 from .tools import TOOL_GROUPS_BY_VERSION, ToolCollection, ToolResult, ToolVersion
 
+# Used if prompt caching is enabled.
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
 
 
@@ -91,6 +92,7 @@ async def sampling_loop(
             only_n_most_recent_images,
             min_removal_threshold=only_n_most_recent_images,
         )
+
     extra_body = {}
     if thinking_budget:
         extra_body = {"thinking": {"type": "enabled", "budget_tokens": thinking_budget}}
@@ -127,9 +129,9 @@ async def sampling_loop(
             extra_headers=extra_headers,
         ) as stream:
             assistant_blocks = []
-            # Stream incremental text chunks.
-            async for chunk in stream.text_stream:
-                block: BetaContentBlockParam = {"type": "text", "text": chunk}
+            # Use iter_text() to iterate over incremental text chunks.
+            async for text in stream.iter_text():
+                block: BetaContentBlockParam = {"type": "text", "text": text}
                 output_callback(block)
                 assistant_blocks.append(block)
             # Obtain the final complete message.
