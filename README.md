@@ -1,4 +1,4 @@
-# operator
+# operative
 
 > [!NOTE]
 > Now featuring support for the new Claude 3.7 Sonnet model! Experience enhanced computer use capabilities with our most advanced model yet.
@@ -41,12 +41,12 @@ Please use [this form](https://forms.gle/BT1hpBrqDPDUrCqo7) to provide feedback 
 export ANTHROPIC_API_KEY=%your_api_key%
 docker run \
     -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-    -v $HOME/.anthropic:/home/operator/.anthropic \
+    -v $HOME/.anthropic:/home/operative/.anthropic \
     -p 5900:5900 \
     -p 8501:8501 \
     -p 6080:6080 \
     -p 8080:8080 \
-    -it ghcr.io/hanzoai/operator:latest
+    -it ghcr.io/hanzoai/operative:latest
 ```
 
 Once the container is running, see the [Accessing the demo app](#accessing-the-demo-app) section below for instructions on how to connect to the interface.
@@ -67,13 +67,13 @@ docker run \
     -e API_PROVIDER=bedrock \
     -e AWS_PROFILE=$AWS_PROFILE \
     -e AWS_REGION=us-west-2 \
-    -v $HOME/.aws:/home/operator/.aws \
-    -v $HOME/.anthropic:/home/operator/.anthropic \
+    -v $HOME/.aws:/home/operative/.aws \
+    -v $HOME/.anthropic:/home/operative/.anthropic \
     -p 5900:5900 \
     -p 8501:8501 \
     -p 6080:6080 \
     -p 8080:8080 \
-    -it ghcr.io/hanzoai/operator:latest
+    -it ghcr.io/hanzoai/operative:latest
 ```
 
 Once the container is running, see the [Accessing the demo app](#accessing-the-demo-app) section below for instructions on how to connect to the interface.
@@ -90,12 +90,12 @@ docker run \
     -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
     -e AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN \
     -e AWS_REGION=us-west-2 \
-    -v $HOME/.anthropic:/home/operator/.anthropic \
+    -v $HOME/.anthropic:/home/operative/.anthropic \
     -p 5900:5900 \
     -p 8501:8501 \
     -p 6080:6080 \
     -p 8080:8080 \
-    -it ghcr.io/hanzoai/operator:latest
+    -it ghcr.io/hanzoai/operative:latest
 ```
 
 Once the container is running, see the [Accessing the demo app](#accessing-the-demo-app) section below for instructions on how to connect to the interface.
@@ -113,7 +113,7 @@ docker run \
     -e API_PROVIDER=vertex \
     -e CLOUD_ML_REGION=$VERTEX_REGION \
     -e ANTHROPIC_VERTEX_PROJECT_ID=$VERTEX_PROJECT_ID \
-    -v $HOME/.config/gcloud/application_default_credentials.json:/home/operator/.config/gcloud/application_default_credentials.json \
+    -v $HOME/.config/gcloud/application_default_credentials.json:/home/operative/.config/gcloud/application_default_credentials.json \
     -p 5900:5900 \
     -p 8501:8501 \
     -p 6080:6080 \
@@ -145,14 +145,14 @@ Environment variables `WIDTH` and `HEIGHT` can be used to set the screen size. F
 ```bash
 docker run \
     -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-    -v $HOME/.anthropic:/home/operator/.anthropic \
+    -v $HOME/.anthropic:/home/operative/.anthropic \
     -p 5900:5900 \
     -p 8501:8501 \
     -p 6080:6080 \
     -p 8080:8080 \
     -e WIDTH=1920 \
     -e HEIGHT=1080 \
-    -it ghcr.io/hanzoai/operator:latest
+    -it ghcr.io/hanzoai/operative:latest
 ```
 
 We do not recommend sending screenshots in resolutions above [XGA/WXGA](https://en.wikipedia.org/wiki/Display_resolution_standards#XGA) to avoid issues related to [image resizing](https://docs.anthropic.com/en/docs/build-with-claude/vision#evaluate-image-size).
@@ -171,13 +171,13 @@ docker build . -t computer-use-demo:local  # manually build the docker image (op
 export ANTHROPIC_API_KEY=%your_api_key%
 docker run \
     -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-    -v $(pwd)/operator:/home/operator/ `# mount local python module for development` \
-    -v $HOME/.anthropic:/home/operator/.anthropic \
+    -v $(pwd)/operative:/home/operative/ `# mount local python module for development` \
+    -v $HOME/.anthropic:/home/operative/.anthropic \
     -p 5900:5900 \
     -p 8501:8501 \
     -p 6080:6080 \
     -p 8080:8080 \
-    -it operator:local # can also use ghcr.io/hanzoai/operator:latest
+    -it operative:local # can also use ghcr.io/hanzoai/operative:latest
 ```
 
 The docker run command above mounts the repo inside the docker image, such that you can edit files from the host. Streamlit is already configured with auto reloading.

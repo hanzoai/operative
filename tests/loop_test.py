@@ -3,7 +3,7 @@ from unittest import mock
 from anthropic.types import TextBlock, ToolUseBlock
 from anthropic.types.beta import BetaMessage, BetaMessageParam, BetaTextBlockParam
 
-from operator.loop import APIProvider, sampling_loop
+from operative.loop import APIProvider, sampling_loop
 
 
 async def test_loop():
@@ -32,9 +32,9 @@ async def test_loop():
     api_response_callback = mock.Mock()
 
     with mock.patch(
-        "operator.loop.Anthropic", return_value=client
+        "operative.loop.Anthropic", return_value=client
     ), mock.patch(
-        "operator.loop.ToolCollection", return_value=tool_collection
+        "operative.loop.ToolCollection", return_value=tool_collection
     ):
         messages: list[BetaMessageParam] = [{"role": "user", "content": "Test message"}]
         result = await sampling_loop(

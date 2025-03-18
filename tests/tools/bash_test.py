@@ -1,6 +1,6 @@
 import pytest
 
-from operator.tools.bash import BashTool20241022, BashTool20250124, ToolError
+from operative.tools.bash import BashTool20241022, BashTool20250124, ToolError
 
 
 @pytest.fixture(params=[BashTool20241022, BashTool20250124])

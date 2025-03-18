@@ -58,14 +58,14 @@ RUN git clone --branch v1.5.0 https://github.com/novnc/noVNC.git /opt/noVNC && \
     ln -s /opt/noVNC/vnc.html /opt/noVNC/index.html
 
 # Setup user
-ENV USERNAME=operator
+ENV USERNAME=operative
 ENV HOME=/home/$USERNAME
 
-# Use a different group to avoid conflict with existing 'operator' group
+# Use a different group to avoid conflict with existing 'operative' group
 RUN useradd -m -s /bin/bash -d "$HOME" -g users "$USERNAME"
 RUN echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-USER operator
+USER operative
 WORKDIR $HOME
 
 # Setup pyenv
@@ -93,12 +93,12 @@ RUN python -m pip install --upgrade pip==23.1.2 setuptools==58.0.4 wheel==0.40.0
     python -m pip config set global.disable-pip-version-check true
 
 # Only reinstall if requirements.txt changes
-COPY --chown=$USERNAME:$USERNAME operator/requirements.txt $HOME/operator/requirements.txt
-RUN python -m pip install -r "$HOME/operator/requirements.txt"
+COPY --chown=$USERNAME:$USERNAME operative/requirements.txt $HOME/operative/requirements.txt
+RUN python -m pip install -r "$HOME/operative/requirements.txt"
 
 # Copy desktop environment/app files
 COPY --chown=$USERNAME:$USERNAME image/ $HOME
-COPY --chown=$USERNAME:$USERNAME operator/ $HOME/operator/
+COPY --chown=$USERNAME:$USERNAME operative/ $HOME/operative/
 
 ARG DISPLAY_NUM=1
 ARG HEIGHT=768

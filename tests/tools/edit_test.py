@@ -3,8 +3,8 @@ from unittest.mock import patch
 
 import pytest
 
-from operator.tools.base import CLIResult, ToolError, ToolResult
-from operator.tools.edit import EditTool20241022, EditTool20250124
+from operative.tools.base import CLIResult, ToolError, ToolResult
+from operative.tools.edit import EditTool20241022, EditTool20250124
 
 
 @pytest.fixture(params=[EditTool20241022, EditTool20250124])
@@ -27,7 +27,7 @@ async def test_view_command(edit_tool):
     # Test viewing a directory
     with patch("pathlib.Path.exists", return_value=True), patch(
         "pathlib.Path.is_dir", return_value=True
-    ), patch("operator.tools.edit.run") as mock_run:
+    ), patch("operative.tools.edit.run") as mock_run:
         mock_run.return_value = (None, "file1.txt\nfile2.txt", None)
         result = await edit_tool(command="view", path="/test/dir")
         assert isinstance(result, CLIResult)

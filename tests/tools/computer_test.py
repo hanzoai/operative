@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from operator.tools.computer import (
+from operative.tools.computer import (
     ComputerTool20241022,
     ComputerTool20250124,
     ScalingSource,

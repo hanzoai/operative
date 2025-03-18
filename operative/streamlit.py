@@ -25,11 +25,11 @@ from anthropic.types.beta import (
 )
 from streamlit.delta_generator import DeltaGenerator
 
-from operator.loop import (
+from operative.loop import (
     APIProvider,
     sampling_loop,
 )
-from operator.tools import ToolResult, ToolVersion
+from operative.tools import ToolResult, ToolVersion
 
 PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
     APIProvider.ANTHROPIC: "claude-3-7-sonnet-20250219",
@@ -195,7 +195,7 @@ async def main():
         st.text_area(
             "Custom System Prompt Suffix",
             key="custom_system_prompt",
-            help="Additional instructions to append to the system prompt. see operator/loop.py for the base system prompt.",
+            help="Additional instructions to append to the system prompt. see operative/loop.py for the base system prompt.",
             on_change=lambda: save_to_storage(
                 "system_prompt", st.session_state.custom_system_prompt
             ),
