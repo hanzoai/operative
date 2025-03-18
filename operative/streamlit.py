@@ -83,7 +83,7 @@ STREAMLIT_STYLE = """
 </style>
 """
 
-WARNING_TEXT = "⚠️ Security Alert: Never provide access to sensitive accounts or data, as malicious web content can hijack Operative's behavior"
+WARNING_TEXT = "⚠️ Security Alert: Never provide access to sensitive accounts or data, as malicious web content can hijack Claude's behavior"
 INTERRUPT_TEXT = "(user stopped or interrupted and wrote the following)"
 INTERRUPT_TOOL_ERROR = "human stopped or interrupted tool execution"
 
@@ -121,8 +121,7 @@ def setup_state():
         st.session_state.token_efficient_tools_beta = False
     if "in_sampling_loop" not in st.session_state:
         st.session_state.in_sampling_loop = False
-    if "thinking_placeholder" not in st.session_state:
-        st.session_state.thinking_placeholder = st.empty()
+    # The thinking_placeholder will be re-created in the Streaming Thoughts tab.
     if "streaming_thoughts" not in st.session_state:
         st.session_state.streaming_thoughts = ""
 
@@ -194,10 +193,10 @@ async def main():
         else:
             st.session_state.auth_validated = True
 
-    chat, http_logs = st.tabs(["Chat", "HTTP Exchange Logs"])
-    new_message = st.chat_input("Type a message to send to Claude to control the computer...")
+    # Create three tabs: Chat, HTTP Logs, and Streaming Thoughts.
+    chat_tab, http_logs_tab, streaming_tab = st.tabs(["Chat", "HTTP Logs", "Streaming Thoughts"])
 
-    with chat:
+    with chat_tab:
         # Render past chats.
         for message in st.session_state.messages:
             if isinstance(message["content"], str):
@@ -209,20 +208,8 @@ async def main():
                     else:
                         _render_message(message["role"], cast(BetaContentBlockParam | ToolResult, block))
 
-        # Render a button to clear streaming thoughts.
-        if st.button("Clear Streaming Thoughts"):
-            st.session_state.streaming_thoughts = ""
-            st.session_state.thinking_placeholder.empty()
-
-        # Render an expander for streaming thoughts.
-        with st.expander("Show Streaming Thoughts", expanded=False):
-            st.markdown(st.session_state.streaming_thoughts)
-
-        # Render past HTTP exchanges.
-        for identity, (request, response) in st.session_state.responses.items():
-            _render_api_response(request, response, identity, http_logs)
-
         # Render new user message.
+        new_message = st.chat_input("Type a message to send to Claude to control the computer...")
         if new_message:
             st.session_state.messages.append({
                 "role": Sender.USER,
@@ -230,43 +217,57 @@ async def main():
             })
             _render_message(Sender.USER, new_message)
 
-        try:
-            most_recent_message = st.session_state["messages"][-1]
-        except IndexError:
-            return
+    with http_logs_tab:
+        # Render past HTTP exchanges.
+        for identity, (request, response) in st.session_state.responses.items():
+            _render_api_response(request, response, identity, http_logs_tab)
 
-        if most_recent_message["role"] is not Sender.USER:
-            return
+    with streaming_tab:
+        # In this tab, re-create a dedicated placeholder for streaming thoughts.
+        streaming_placeholder = st.empty()
+        # Clear button for streaming thoughts.
+        if st.button("Clear Streaming Thoughts", key="clear_streaming"):
+            st.session_state.streaming_thoughts = ""
+            streaming_placeholder.empty()
+        # Display the accumulated streaming thoughts.
+        st.markdown(st.session_state.streaming_thoughts)
 
-        # Custom callback to handle bot output.
-        def bot_output_callback(message: BetaContentBlockParam):
-            if isinstance(message, dict) and message.get("type") == "thinking":
-                # Append new thinking content.
-                current = st.session_state.streaming_thoughts
-                st.session_state.streaming_thoughts = current + message.get("thinking", "") + "\n"
-                st.session_state.thinking_placeholder.markdown(
-                    f"**[Streaming Thoughts]**\n{st.session_state.streaming_thoughts}"
-                )
-            else:
-                st.session_state.thinking_placeholder.empty()
-                _render_message(Sender.BOT, message)
+    # Ensure there is a user message to trigger a response.
+    try:
+        most_recent_message = st.session_state["messages"][-1]
+    except IndexError:
+        return
+    if most_recent_message["role"] is not Sender.USER:
+        return
 
-        with track_sampling_loop():
-            st.session_state.messages = await sampling_loop(
-                system_prompt_suffix=st.session_state.custom_system_prompt,
-                model=st.session_state.model,
-                provider=st.session_state.provider,
-                messages=st.session_state.messages,
-                output_callback=bot_output_callback,
-                tool_output_callback=partial(_tool_output_callback, tool_state=st.session_state.tools),
-                api_response_callback=partial(_api_response_callback, tab=http_logs, response_state=st.session_state.responses),
-                api_key=st.session_state.api_key,
-                only_n_most_recent_images=st.session_state.only_n_most_recent_images,
-                tool_version=st.session_state.tool_version,
-                max_tokens=st.session_state.output_tokens,
-                thinking_budget=st.session_state.thinking_budget if st.session_state.thinking else None,
-                token_efficient_tools_beta=st.session_state.token_efficient_tools_beta,
-            )
+    # Custom callback to handle bot output.
+    def bot_output_callback(message: BetaContentBlockParam):
+        if isinstance(message, dict) and message.get("type") == "thinking":
+            # Append new thinking content.
+            current = st.session_state.streaming_thoughts
+            st.session_state.streaming_thoughts = current + message.get("thinking", "") + "\n"
+            # Update the placeholder in the Streaming Thoughts tab.
+            streaming_placeholder.markdown(f"**[Streaming Thoughts]**\n{st.session_state.streaming_thoughts}")
+        else:
+            # For non-thinking content, render it normally in Chat.
+            _render_message(Sender.BOT, message)
+
+    with track_sampling_loop():
+        st.session_state.messages = await sampling_loop(
+            system_prompt_suffix=st.session_state.custom_system_prompt,
+            model=st.session_state.model,
+            provider=st.session_state.provider,
+            messages=st.session_state.messages,
+            output_callback=bot_output_callback,
+            tool_output_callback=partial(_tool_output_callback, tool_state=st.session_state.tools),
+            api_response_callback=partial(_api_response_callback, tab=http_logs_tab, response_state=st.session_state.responses),
+            api_key=st.session_state.api_key,
+            only_n_most_recent_images=st.session_state.only_n_most_recent_images,
+            tool_version=st.session_state.tool_version,
+            max_tokens=st.session_state.output_tokens,
+            thinking_budget=st.session_state.thinking_budget if st.session_state.thinking else None,
+            token_efficient_tools_beta=st.session_state.token_efficient_tools_beta,
+        )
 
 
 def maybe_add_interruption_blocks():

@@ -63,6 +63,13 @@ SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 </IMPORTANT>"""
 
 
+# Helper: wrap a synchronous iterator as an async iterator.
+async def _async_iter(sync_iterable):
+    for item in sync_iterable:
+        yield item
+        await 0  # yield control to the event loop
+
+
 async def sampling_loop(
     *,
     model: str,
@@ -152,8 +159,8 @@ async def sampling_loop(
         assistant_blocks = []
         tool_result_content = []
 
-        # Process streamed chunks
-        for raw_chunk in stream_response:
+        # Use our async wrapper to iterate over the synchronous streaming response.
+        async for raw_chunk in _async_iter(stream_response):
             chunk = raw_chunk.parse()
             for content_block in chunk:
                 output_callback(content_block)
