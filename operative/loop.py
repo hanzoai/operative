@@ -129,17 +129,18 @@ async def sampling_loop(
             extra_headers=extra_headers,
         ) as stream:
             assistant_blocks = []
-            # Use iter_text() to iterate over incremental text chunks.
+            # Use iter_text() to yield incremental text chunks.
             async for text in stream.iter_text():
                 block: BetaContentBlockParam = {"type": "text", "text": text}
                 output_callback(block)
                 assistant_blocks.append(block)
-            # Obtain the final complete message.
-            final_message: BetaMessage = await stream.get_final_message()
+            # Instead of get_final_message(), we call parse() to obtain the final message.
+            final_message: BetaMessage = await stream.parse()
     except Exception as e:
         api_response_callback(None, None, e)
         return messages
 
+    # No raw HTTP request info available.
     api_response_callback(None, None, None)
 
     final_blocks = _response_to_params(final_message)
