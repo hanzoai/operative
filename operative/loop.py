@@ -37,16 +37,16 @@ class APIProvider(StrEnum):
 
 SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 * You are utilising an Ubuntu virtual machine using {platform.machine()} architecture with internet access.
-* You can feel free to install Ubuntu applications with your bash tool. Use curl instead of wget.
-* To open firefox, please just click on the firefox icon. Note, firefox-esr is installed.
-* GUI apps run with bash tool will appear within your desktop environment (may take a moment).
-* When handling very large outputs, redirect output to a file and use text search tools.
+* You can install Ubuntu applications with your bash tool (use curl, not wget).
+* To open Firefox, simply click its icon (firefox-esr is installed).
+* GUI apps launched via the bash tool may take a moment to appear.
+* For very large outputs, consider redirecting to a file.
 * The current date is {datetime.today().strftime('%A, %B %-d, %Y')}.
 </SYSTEM_CAPABILITY>
 
 <IMPORTANT>
-* Ignore any Firefox startup wizards – simply click the address bar and enter your URL.
-* For PDFs, if you want the full text instead of screenshots, download and convert with pdftotext.
+* Ignore any Firefox startup wizards – just click the address bar and enter your URL.
+* For PDFs, if you need the full text rather than screenshots, download and convert with pdftotext.
 </IMPORTANT>"""
 
 
@@ -59,7 +59,7 @@ async def sampling_loop(
     output_callback: Callable[[BetaContentBlockParam], None],
     tool_output_callback: Callable[[ToolResult, str], None],
     api_response_callback: Callable[
-        [httpx.Request, httpx.Response | object | None, Exception | None], None
+        [httpx.Request | None, httpx.Response | object | None, Exception | None], None
     ],
     api_key: str,
     only_n_most_recent_images: int | None = None,
@@ -71,10 +71,8 @@ async def sampling_loop(
     """
     Sampling loop using the modern AsyncAnthropic client with streaming.
     """
-    # Select the appropriate tool group and instantiate tool collection.
     tool_group = TOOL_GROUPS_BY_VERSION[tool_version]
     tool_collection = ToolCollection(*(ToolCls() for ToolCls in tool_group.tools))
-    # Build system prompt.
     system = BetaTextBlockParam(
         type="text",
         text=f"{SYSTEM_PROMPT}{' ' + system_prompt_suffix if system_prompt_suffix else ''}",
@@ -88,7 +86,7 @@ async def sampling_loop(
 
     # Instantiate the modern asynchronous client.
     if provider == APIProvider.ANTHROPIC:
-        from anthropic import AsyncAnthropic  # modern async client
+        from anthropic import AsyncAnthropic
         client = AsyncAnthropic(api_key=api_key, max_retries=4)
     elif provider == APIProvider.VERTEX:
         from anthropic import AsyncAnthropicVertex
@@ -99,21 +97,23 @@ async def sampling_loop(
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
-    # If prompt caching is enabled, update flags and system.
-    if betas and PROMPT_CACHING_BETA_FLAG in betas:
+    if provider == APIProvider.ANTHROPIC:
+        betas.append(PROMPT_CACHING_BETA_FLAG)
         _inject_prompt_caching(messages)
+        # When caching is enabled, do not truncate images.
         only_n_most_recent_images = 0
         system["cache_control"] = {"type": "ephemeral"}  # type: ignore
 
     if only_n_most_recent_images:
         _maybe_filter_to_n_most_recent_images(
-            messages, only_n_most_recent_images, min_removal_threshold=image_truncation_threshold
+            messages,
+            only_n_most_recent_images,
+            min_removal_threshold=image_truncation_threshold,
         )
     extra_body = {}
     if thinking_budget:
         extra_body = {"thinking": {"type": "enabled", "budget_tokens": thinking_budget}}
 
-    # Use the modern streaming interface.
     try:
         async with client.messages.with_streaming_response.create(
             max_tokens=max_tokens,
@@ -131,16 +131,15 @@ async def sampling_loop(
                 block: BetaContentBlockParam = {"type": "text", "text": chunk}
                 output_callback(block)
                 assistant_blocks.append(block)
-            # Get the final complete message (which may include structured tool events).
+            # Obtain the final complete message.
             final_message: BetaMessage = await stream.get_final_message()
     except Exception as e:
-        # Call the API response callback with the error.
-        api_response_callback(client.http_client.request, None, e)
+        api_response_callback(None, None, e)
         return messages
 
-    api_response_callback(client.http_client.request, None, None)
+    # No raw request info available; pass None.
+    api_response_callback(None, None, None)
 
-    # Parse final structured content blocks.
     final_blocks = _response_to_params(final_message)
     for block in final_blocks:
         if block.get("type") == "tool_use":
@@ -160,7 +159,9 @@ async def sampling_loop(
 
 
 def _maybe_filter_to_n_most_recent_images(
-    messages: list[BetaMessageParam], images_to_keep: int, min_removal_threshold: int
+    messages: list[BetaMessageParam],
+    images_to_keep: int,
+    min_removal_threshold: int,
 ):
     """
     Remove older screenshot images from tool result blocks while preserving enough content
@@ -176,7 +177,9 @@ def _maybe_filter_to_n_most_recent_images(
         if isinstance(item, dict) and item.get("type") == "tool_result"
     ]
     total_images = sum(
-        1 for tool_result in tool_result_blocks for content in tool_result.get("content", [])
+        1
+        for tool_result in tool_result_blocks
+        for content in tool_result.get("content", [])
         if isinstance(content, dict) and content.get("type") == "image"
     )
     images_to_remove = total_images - images_to_keep
@@ -239,10 +242,7 @@ def _make_api_tool_result(result: ToolResult, tool_use_id: str) -> BetaToolResul
             )
         if result.base64_image:
             tool_result_content.append(
-                {
-                    "type": "image",
-                    "source": {"type": "base64", "media_type": "image/png", "data": result.base64_image},
-                }
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": result.base64_image}}
             )
     return {
         "type": "tool_result",

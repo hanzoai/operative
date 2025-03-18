@@ -1,5 +1,5 @@
 """
-Entrypoint for streamlit, using the modern AsyncAnthropic client.
+Entrypoint for Streamlit using the modern AsyncAnthropic client.
 """
 
 import asyncio
@@ -15,8 +15,8 @@ from functools import partial
 from pathlib import PosixPath
 from typing import cast, get_args
 
-import httpx
 import streamlit as st
+import httpx
 from anthropic import RateLimitError
 from anthropic.types.beta import (
     BetaContentBlockParam,
@@ -183,7 +183,6 @@ async def main():
     chat_tab, http_logs_tab, streaming_tab = st.tabs(["Chat", "HTTP Exchange Logs", "Streaming Thoughts"])
 
     with chat_tab:
-        # Render past chats.
         for message in st.session_state.messages:
             if isinstance(message["content"], str):
                 _render_message(message["role"], message["content"])
@@ -206,7 +205,6 @@ async def main():
             _render_api_response(request, response, identity, http_logs_tab)
 
     with streaming_tab:
-        # Create a dedicated placeholder for streaming thoughts.
         streaming_placeholder = st.empty()
         if st.button("Clear Streaming Thoughts", key="clear_streaming"):
             st.session_state.streaming_thoughts = ""
@@ -220,7 +218,6 @@ async def main():
     if most_recent_message["role"] is not Sender.USER:
         return
 
-    # Custom callback for bot output that appends thinking content to the Streaming Thoughts tab.
     def bot_output_callback(message: BetaContentBlockParam):
         if isinstance(message, dict) and message.get("type") == "thinking":
             current = st.session_state.streaming_thoughts
@@ -314,7 +311,7 @@ def save_to_storage(filename: str, data: str) -> None:
 
 
 def _api_response_callback(
-    request: httpx.Request,
+    request: httpx.Request | None,
     response: httpx.Response | object | None,
     error: Exception | None,
     tab: DeltaGenerator,
@@ -333,7 +330,7 @@ def _tool_output_callback(tool_output: ToolResult, tool_id: str, tool_state: dic
 
 
 def _render_api_response(
-    request: httpx.Request,
+    request: httpx.Request | None,
     response: httpx.Response | object | None,
     response_id: str,
     tab: DeltaGenerator,
@@ -341,14 +338,16 @@ def _render_api_response(
     with tab:
         with st.expander(f"Request/Response ({response_id})"):
             newline = "\n\n"
-            st.markdown(f"`{request.method} {request.url}`{newline}{newline.join(f'`{k}: {v}`' for k, v in request.headers.items())}")
-            st.json(request.read().decode())
+            req_info = f"{request.method} {request.url}" if request else "N/A"
+            headers = request.headers.items() if request else []
+            st.markdown(f"`{req_info}`{newline}{newline.join(f'`{k}: {v}`' for k, v in headers)}")
+            st.json(request.read().decode() if request else "No request data available")
             st.markdown("---")
             if isinstance(response, httpx.Response):
                 st.markdown(f"`{response.status_code}`{newline}{newline.join(f'`{k}: {v}`' for k, v in response.headers.items())}")
                 try:
                     st.json(response.text)
-                except Exception as e:
+                except Exception:
                     st.write("Response content not available due to streaming.")
             else:
                 st.write(response)
@@ -366,38 +365,4 @@ def _render_error(error: Exception):
         lines = "\n".join(traceback.format_exception(error))
         body += f"\n\n```{lines}```"
     save_to_storage(f"error_{datetime.now().timestamp()}.md", body)
-    st.error(f"**{error.__class__.__name__}**\n\n{body}", icon=":material/error:")
-
-
-def _render_message(sender: Sender, message: str | BetaContentBlockParam | ToolResult):
-    """Convert input from the user or output from the agent to a Streamlit message."""
-    is_tool_result = not isinstance(message, str | dict)
-    if not message or (is_tool_result and st.session_state.hide_images and not hasattr(message, "error") and not hasattr(message, "output")):
-        return
-    with st.chat_message(sender):
-        if is_tool_result:
-            message = cast(ToolResult, message)
-            if message.output:
-                if message.__class__.__name__ == "CLIResult":
-                    st.code(message.output)
-                else:
-                    st.markdown(message.output)
-            if message.error:
-                st.error(message.error)
-            if message.base64_image and not st.session_state.hide_images:
-                st.image(base64.b64decode(message.base64_image))
-        elif isinstance(message, dict):
-            if message["type"] == "text":
-                st.write(message["text"])
-            elif message["type"] == "thinking":
-                st.markdown(f"[Thinking]\n\n{message.get('thinking', '')}")
-            elif message["type"] == "tool_use":
-                st.code(f'Tool Use: {message["name"]}\nInput: {message["input"]}')
-            else:
-                raise Exception(f'Unexpected response type {message["type"]}')
-        else:
-            st.markdown(message)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    st.error(f"**{
