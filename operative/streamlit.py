@@ -1,5 +1,5 @@
 """
-Entrypoint for streamlit, see https://docs.streamlit.io/
+Entrypoint for streamlit, using the modern AsyncAnthropic client.
 """
 
 import asyncio
@@ -25,10 +25,7 @@ from anthropic.types.beta import (
 )
 from streamlit.delta_generator import DeltaGenerator
 
-from operative.loop import (
-    APIProvider,
-    sampling_loop,
-)
+from operative.loop import APIProvider, sampling_loop
 from operative.tools import ToolResult, ToolVersion
 
 PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
@@ -51,14 +48,12 @@ SONNET_3_5_NEW = ModelConfig(
     max_output_tokens=1024 * 8,
     default_output_tokens=1024 * 4,
 )
-
 SONNET_3_7 = ModelConfig(
     tool_version="computer_use_20250124",
     max_output_tokens=128_000,
     default_output_tokens=1024 * 16,
     has_thinking=True,
 )
-
 MODEL_TO_MODEL_CONF: dict[str, ModelConfig] = {
     "claude-3-7-sonnet-20250219": SONNET_3_7,
 }
@@ -67,7 +62,6 @@ CONFIG_DIR = PosixPath("~/.anthropic").expanduser()
 API_KEY_FILE = CONFIG_DIR / "api_key"
 STREAMLIT_STYLE = """
 <style>
-    /* Highlight the stop button in red */
     button[kind=header] {
         background-color: rgb(255, 75, 75);
         border: 1px solid rgb(255, 75, 75);
@@ -76,14 +70,13 @@ STREAMLIT_STYLE = """
     button[kind=header]:hover {
         background-color: rgb(255, 51, 51);
     }
-    /* Hide the streamlit deploy button */
     .stAppDeployButton {
         visibility: hidden;
     }
 </style>
 """
 
-WARNING_TEXT = "⚠️ Security Alert: Never provide access to sensitive accounts or data, as malicious web content can hijack Claude's behavior"
+WARNING_TEXT = "⚠️ Security Alert: Never provide access to sensitive accounts or data."
 INTERRUPT_TEXT = "(user stopped or interrupted and wrote the following)"
 INTERRUPT_TOOL_ERROR = "human stopped or interrupted tool execution"
 
@@ -121,7 +114,6 @@ def setup_state():
         st.session_state.token_efficient_tools_beta = False
     if "in_sampling_loop" not in st.session_state:
         st.session_state.in_sampling_loop = False
-    # The thinking_placeholder will be re-created in the Streaming Thoughts tab.
     if "streaming_thoughts" not in st.session_state:
         st.session_state.streaming_thoughts = ""
 
@@ -141,17 +133,14 @@ def _reset_model_conf():
 
 
 async def main():
-    """Render loop for streamlit"""
+    """Main render loop for Streamlit."""
     setup_state()
-
     st.markdown(STREAMLIT_STYLE, unsafe_allow_html=True)
     st.title("Hanzo Operative")
-
     if not os.getenv("HIDE_WARNING", False):
         st.warning(WARNING_TEXT)
 
     with st.sidebar:
-
         def _reset_api_provider():
             if st.session_state.provider_radio != st.session_state.provider:
                 _reset_model()
@@ -161,14 +150,12 @@ async def main():
         provider_options = [option.value for option in APIProvider]
         st.radio("API Provider", options=provider_options, key="provider_radio", format_func=lambda x: x.title(), on_change=_reset_api_provider)
         st.text_input("Model", key="model", on_change=_reset_model_conf)
-
         if st.session_state.provider == APIProvider.ANTHROPIC:
             st.text_input("Anthropic API Key", type="password", key="api_key", on_change=lambda: save_to_storage("api_key", st.session_state.api_key))
-
         st.number_input("Only send N most recent images", min_value=0, key="only_n_most_recent_images",
-                        help="To decrease the total tokens sent, remove older screenshots from the conversation")
+                        help="Remove older screenshots to decrease token usage")
         st.text_area("Custom System Prompt Suffix", key="custom_system_prompt",
-                     help="Additional instructions to append to the system prompt. See operative/loop.py for the base system prompt.",
+                     help="Additional instructions to append to the system prompt.",
                      on_change=lambda: save_to_storage("system_prompt", st.session_state.custom_system_prompt))
         st.checkbox("Hide screenshots", key="hide_images")
         st.checkbox("Enable token-efficient tools beta", key="token_efficient_tools_beta")
@@ -177,14 +164,13 @@ async def main():
         st.number_input("Max Output Tokens", key="output_tokens", step=1)
         st.checkbox("Thinking Enabled", key="thinking", value=False)
         st.number_input("Thinking Budget", key="thinking_budget", max_value=st.session_state.max_output_tokens, step=1, disabled=not st.session_state.thinking)
-
         if st.button("Reset", type="primary"):
             with st.spinner("Resetting..."):
                 st.session_state.clear()
                 setup_state()
-                subprocess.run("pkill Xvfb; pkill tint2", shell=True)  # noqa: ASYNC221
+                subprocess.run("pkill Xvfb; pkill tint2", shell=True)
                 await asyncio.sleep(1)
-                subprocess.run("./start_all.sh", shell=True)  # noqa: ASYNC221
+                subprocess.run("./start_all.sh", shell=True)
 
     if not st.session_state.auth_validated:
         if auth_error := validate_auth(st.session_state.provider, st.session_state.api_key):
@@ -193,8 +179,8 @@ async def main():
         else:
             st.session_state.auth_validated = True
 
-    # Create three tabs: Chat, HTTP Logs, and Streaming Thoughts.
-    chat_tab, http_logs_tab, streaming_tab = st.tabs(["Chat", "HTTP Logs", "Streaming Thoughts"])
+    # Create three tabs: Chat, HTTP Exchange Logs, and Streaming Thoughts.
+    chat_tab, http_logs_tab, streaming_tab = st.tabs(["Chat", "HTTP Exchange Logs", "Streaming Thoughts"])
 
     with chat_tab:
         # Render past chats.
@@ -203,12 +189,10 @@ async def main():
                 _render_message(message["role"], message["content"])
             elif isinstance(message["content"], list):
                 for block in message["content"]:
-                    if isinstance(block, dict) and block["type"] == "tool_result":
+                    if isinstance(block, dict) and block.get("type") == "tool_result":
                         _render_message(Sender.TOOL, st.session_state.tools[block["tool_use_id"]])
                     else:
                         _render_message(message["role"], cast(BetaContentBlockParam | ToolResult, block))
-
-        # Render new user message.
         new_message = st.chat_input("Type a message to send to Claude to control the computer...")
         if new_message:
             st.session_state.messages.append({
@@ -218,21 +202,17 @@ async def main():
             _render_message(Sender.USER, new_message)
 
     with http_logs_tab:
-        # Render past HTTP exchanges.
         for identity, (request, response) in st.session_state.responses.items():
             _render_api_response(request, response, identity, http_logs_tab)
 
     with streaming_tab:
-        # In this tab, re-create a dedicated placeholder for streaming thoughts.
+        # Create a dedicated placeholder for streaming thoughts.
         streaming_placeholder = st.empty()
-        # Clear button for streaming thoughts.
         if st.button("Clear Streaming Thoughts", key="clear_streaming"):
             st.session_state.streaming_thoughts = ""
             streaming_placeholder.empty()
-        # Display the accumulated streaming thoughts.
-        st.markdown(st.session_state.streaming_thoughts)
+        streaming_placeholder.markdown(f"**[Streaming Thoughts]**\n{st.session_state.streaming_thoughts}")
 
-    # Ensure there is a user message to trigger a response.
     try:
         most_recent_message = st.session_state["messages"][-1]
     except IndexError:
@@ -240,16 +220,13 @@ async def main():
     if most_recent_message["role"] is not Sender.USER:
         return
 
-    # Custom callback to handle bot output.
+    # Custom callback for bot output that appends thinking content to the Streaming Thoughts tab.
     def bot_output_callback(message: BetaContentBlockParam):
         if isinstance(message, dict) and message.get("type") == "thinking":
-            # Append new thinking content.
             current = st.session_state.streaming_thoughts
             st.session_state.streaming_thoughts = current + message.get("thinking", "") + "\n"
-            # Update the placeholder in the Streaming Thoughts tab.
             streaming_placeholder.markdown(f"**[Streaming Thoughts]**\n{st.session_state.streaming_thoughts}")
         else:
-            # For non-thinking content, render it normally in Chat.
             _render_message(Sender.BOT, message)
 
     with track_sampling_loop():
@@ -275,7 +252,7 @@ def maybe_add_interruption_blocks():
         return []
     result = []
     last_message = st.session_state.messages[-1]
-    previous_tool_use_ids = [block["id"] for block in last_message["content"] if block["type"] == "tool_use"]
+    previous_tool_use_ids = [block["id"] for block in last_message["content"] if block.get("type") == "tool_use"]
     for tool_use_id in previous_tool_use_ids:
         st.session_state.tools[tool_use_id] = ToolResult(error=INTERRUPT_TOOL_ERROR)
         result.append(BetaToolResultBlockParam(
@@ -381,7 +358,7 @@ def _render_error(error: Exception):
     if isinstance(error, RateLimitError):
         body = "You have been rate limited."
         if retry_after := error.response.headers.get("retry-after"):
-            body += f" **Retry after {str(timedelta(seconds=int(retry_after)))} (HH:MM:SS).** See our API documentation for more details."
+            body += f" **Retry after {str(timedelta(seconds=int(retry_after)))} (HH:MM:SS).**"
         body += f"\n\n{error.message}"
     else:
         body = str(error)
@@ -393,7 +370,7 @@ def _render_error(error: Exception):
 
 
 def _render_message(sender: Sender, message: str | BetaContentBlockParam | ToolResult):
-    """Convert input from the user or output from the agent to a streamlit message."""
+    """Convert input from the user or output from the agent to a Streamlit message."""
     is_tool_result = not isinstance(message, str | dict)
     if not message or (is_tool_result and st.session_state.hide_images and not hasattr(message, "error") and not hasattr(message, "output")):
         return
