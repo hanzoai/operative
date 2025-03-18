@@ -54,7 +54,8 @@ SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 * You are utilising an Ubuntu virtual machine using {platform.machine()} architecture with internet access.
 * You can feel free to install Ubuntu applications with your bash tool. Use curl instead of wget.
 * To open firefox, please just click on the firefox icon.  Note, firefox-esr is what is installed on your system.
-* Using bash tool you can start GUI applications, but you need to set export DISPLAY=:1 and use a subshell. For example "(DISPLAY=:1 xterm &)". GUI apps run with bash tool will appear within your desktop environment, but they may take some time to appear. Take a screenshot to confirm it did.
+* Using bash tool you can start GUI applications, but you need to set export DISPLAY=:1 and use a subshell. For example "(DISPLAY=:1 xterm &)".
+* GUI apps run with bash tool will appear within your desktop environment, but they may take some time to appear. Take a screenshot to confirm it did.
 * When using your bash tool with commands that are expected to output very large quantities of text, redirect into a tmp file and use str_replace_editor or `grep -n -B <lines before> -A <lines after> <query> <filename>` to confirm output.
 * When viewing a page it can be helpful to zoom out so that you can see everything on the page.  Either that, or make sure you scroll down to see everything before deciding something isn't available.
 * When using your computer function calls, they take a while to run and send back to you.  Where possible/feasible, try to chain multiple of these calls all into one function calls request.
@@ -86,7 +87,8 @@ async def sampling_loop(
     token_efficient_tools_beta: bool = False,
 ):
     """
-    Agentic sampling loop for the assistant/tool interaction of computer use.
+    Agentic sampling loop for the assistant/tool interaction of computer use,
+    updated to use streaming.
     """
     tool_group = TOOL_GROUPS_BY_VERSION[tool_version]
     tool_collection = ToolCollection(*(ToolCls() for ToolCls in tool_group.tools))
@@ -112,10 +114,8 @@ async def sampling_loop(
         if enable_prompt_caching:
             betas.append(PROMPT_CACHING_BETA_FLAG)
             _inject_prompt_caching(messages)
-            # Because cached reads are 10% of the price, we don't think it's
-            # ever sensible to break the cache by truncating images
+            # Because cached reads are 10% of the price, we don't break the cache by truncating images
             only_n_most_recent_images = 0
-            # Use type ignore to bypass TypedDict check until SDK types are updated
             system["cache_control"] = {"type": "ephemeral"}  # type: ignore
 
         if only_n_most_recent_images:
@@ -126,17 +126,13 @@ async def sampling_loop(
             )
         extra_body = {}
         if thinking_budget:
-            # Ensure we only send the required fields for thinking
             extra_body = {
                 "thinking": {"type": "enabled", "budget_tokens": thinking_budget}
             }
 
-        # Call the API
-        # we use raw_response to provide debug information to streamlit. Your
-        # implementation may be able call the SDK directly with:
-        # `response = client.messages.create(...)` instead.
+        # Call the API in streaming mode by adding stream=True.
         try:
-            raw_response = client.beta.messages.with_raw_response.create(
+            stream_response = client.beta.messages.with_raw_response.create(
                 max_tokens=max_tokens,
                 messages=messages,
                 model=model,
@@ -144,6 +140,7 @@ async def sampling_loop(
                 tools=tool_collection.to_params(),
                 betas=betas,
                 extra_body=extra_body,
+                stream=True,  # enable streaming
             )
         except (APIStatusError, APIResponseValidationError) as e:
             api_response_callback(e.request, e.response, e)
@@ -153,32 +150,40 @@ async def sampling_loop(
             return messages
 
         api_response_callback(
-            raw_response.http_response.request, raw_response.http_response, None
+            stream_response.http_response.request,
+            stream_response.http_response,
+            None,
         )
 
-        response = raw_response.parse()
+        # Initialize accumulators for the assistant response and tool results.
+        assistant_blocks = []
+        tool_result_content = []
 
-        response_params = _response_to_params(response)
+        # Iterate asynchronously over streamed response chunks.
+        async for raw_chunk in stream_response:
+            chunk = raw_chunk.parse()
+            for content_block in chunk:
+                # Immediately call output_callback for each chunk.
+                output_callback(content_block)
+                assistant_blocks.append(content_block)
+                if content_block["type"] == "tool_use":
+                    result = await tool_collection.run(
+                        name=content_block["name"],
+                        tool_input=cast(dict[str, Any], content_block["input"]),
+                    )
+                    tool_result = _make_api_tool_result(result, content_block["id"])
+                    tool_output_callback(result, content_block["id"])
+                    tool_result_content.append(tool_result)
+
+        # Append the fully streamed assistant message.
         messages.append(
             {
                 "role": "assistant",
-                "content": response_params,
+                "content": assistant_blocks,
             }
         )
 
-        tool_result_content: list[BetaToolResultBlockParam] = []
-        for content_block in response_params:
-            output_callback(content_block)
-            if content_block["type"] == "tool_use":
-                result = await tool_collection.run(
-                    name=content_block["name"],
-                    tool_input=cast(dict[str, Any], content_block["input"]),
-                )
-                tool_result_content.append(
-                    _make_api_tool_result(result, content_block["id"])
-                )
-                tool_output_callback(result, content_block["id"])
-
+        # If no tool-use was requested, we can finish the loop.
         if not tool_result_content:
             return messages
 
@@ -243,7 +248,6 @@ def _response_to_params(
             if block.text:
                 res.append(BetaTextBlockParam(type="text", text=block.text))
             elif getattr(block, "type", None) == "thinking":
-                # Handle thinking blocks - include signature field
                 thinking_block = {
                     "type": "thinking",
                     "thinking": getattr(block, "thinking", None),
@@ -252,7 +256,6 @@ def _response_to_params(
                     thinking_block["signature"] = getattr(block, "signature", None)
                 res.append(cast(BetaContentBlockParam, thinking_block))
         else:
-            # Handle tool use blocks normally
             res.append(cast(BetaToolUseBlockParam, block.model_dump()))
     return res
 
@@ -264,7 +267,6 @@ def _inject_prompt_caching(
     Set cache breakpoints for the 3 most recent turns
     one cache breakpoint is left for tools/system prompt, to be shared across sessions
     """
-
     breakpoints_remaining = 3
     for message in reversed(messages):
         if message["role"] == "user" and isinstance(
@@ -272,13 +274,11 @@ def _inject_prompt_caching(
         ):
             if breakpoints_remaining:
                 breakpoints_remaining -= 1
-                # Use type ignore to bypass TypedDict check until SDK types are updated
                 content[-1]["cache_control"] = BetaCacheControlEphemeralParam(  # type: ignore
                     {"type": "ephemeral"}
                 )
             else:
                 content[-1].pop("cache_control", None)
-                # we'll only every have one extra turn per loop
                 break
 
 

@@ -98,7 +98,6 @@ def setup_state():
     if "messages" not in st.session_state:
         st.session_state.messages = []
     if "api_key" not in st.session_state:
-        # Try to load API key from file first, then environment
         st.session_state.api_key = load_from_storage("api_key") or os.getenv(
             "ANTHROPIC_API_KEY", ""
         )
@@ -126,6 +125,8 @@ def setup_state():
         st.session_state.token_efficient_tools_beta = False
     if "in_sampling_loop" not in st.session_state:
         st.session_state.in_sampling_loop = False
+    if "thinking_placeholder" not in st.session_state:
+        st.session_state.thinking_placeholder = st.empty()
 
 
 def _reset_model():
@@ -242,19 +243,18 @@ async def main():
             st.session_state.auth_validated = True
 
     chat, http_logs = st.tabs(["Chat", "HTTP Exchange Logs"])
+
     new_message = st.chat_input(
         "Type a message to send to Claude to control the computer..."
     )
 
     with chat:
-        # render past chats
+        # Render past chats.
         for message in st.session_state.messages:
             if isinstance(message["content"], str):
                 _render_message(message["role"], message["content"])
             elif isinstance(message["content"], list):
                 for block in message["content"]:
-                    # the tool result we send back to the Anthropic API isn't sufficient to render all details,
-                    # so we store the tool use responses
                     if isinstance(block, dict) and block["type"] == "tool_result":
                         _render_message(
                             Sender.TOOL, st.session_state.tools[block["tool_use_id"]]
@@ -265,11 +265,11 @@ async def main():
                             cast(BetaContentBlockParam | ToolResult, block),
                         )
 
-        # render past http exchanges
+        # Render past HTTP exchanges.
         for identity, (request, response) in st.session_state.responses.items():
             _render_api_response(request, response, identity, http_logs)
 
-        # render past chats
+        # Render new user message.
         if new_message:
             st.session_state.messages.append(
                 {
@@ -288,17 +288,25 @@ async def main():
             return
 
         if most_recent_message["role"] is not Sender.USER:
-            # we don't have a user message to respond to, exit early
             return
 
+        # Define a custom callback for bot output to handle "thinking" messages.
+        def bot_output_callback(message: BetaContentBlockParam):
+            if isinstance(message, dict) and message.get("type") == "thinking":
+                st.session_state.thinking_placeholder.markdown(
+                    f"**[Thinking]** {message.get('thinking', '')}"
+                )
+            else:
+                st.session_state.thinking_placeholder.empty()
+                _render_message(Sender.BOT, message)
+
         with track_sampling_loop():
-            # run the agent sampling loop with the newest message
             st.session_state.messages = await sampling_loop(
                 system_prompt_suffix=st.session_state.custom_system_prompt,
                 model=st.session_state.model,
                 provider=st.session_state.provider,
                 messages=st.session_state.messages,
-                output_callback=partial(_render_message, Sender.BOT),
+                output_callback=bot_output_callback,
                 tool_output_callback=partial(
                     _tool_output_callback, tool_state=st.session_state.tools
                 ),
@@ -321,8 +329,6 @@ async def main():
 def maybe_add_interruption_blocks():
     if not st.session_state.in_sampling_loop:
         return []
-    # If this function is called while we're in the sampling loop, we can assume that the previous sampling loop was interrupted
-    # and we should annotate the conversation with additional context for the model and heal any incomplete tool use calls
     result = []
     last_message = st.session_state.messages[-1]
     previous_tool_use_ids = [
@@ -373,7 +379,6 @@ def validate_auth(provider: APIProvider, api_key: str | None):
 
 
 def load_from_storage(filename: str) -> str | None:
-    """Load data from a file in the storage directory."""
     try:
         file_path = CONFIG_DIR / filename
         if file_path.exists():
@@ -386,12 +391,10 @@ def load_from_storage(filename: str) -> str | None:
 
 
 def save_to_storage(filename: str, data: str) -> None:
-    """Save data to a file in the storage directory."""
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         file_path = CONFIG_DIR / filename
         file_path.write_text(data)
-        # Ensure only user can read/write the file
         file_path.chmod(0o600)
     except Exception as e:
         st.write(f"Debug: Error saving {filename}: {e}")
@@ -404,9 +407,6 @@ def _api_response_callback(
     tab: DeltaGenerator,
     response_state: dict[str, tuple[httpx.Request, httpx.Response | object | None]],
 ):
-    """
-    Handle an API response by storing it to state and rendering it.
-    """
     response_id = datetime.now().isoformat()
     response_state[response_id] = (request, response)
     if error:
@@ -417,7 +417,6 @@ def _api_response_callback(
 def _tool_output_callback(
     tool_output: ToolResult, tool_id: str, tool_state: dict[str, ToolResult]
 ):
-    """Handle a tool output by storing it to state and rendering it."""
     tool_state[tool_id] = tool_output
     _render_message(Sender.TOOL, tool_output)
 
@@ -428,7 +427,6 @@ def _render_api_response(
     response_id: str,
     tab: DeltaGenerator,
 ):
-    """Render an API response to a streamlit tab"""
     with tab:
         with st.expander(f"Request/Response ({response_id})"):
             newline = "\n\n"
@@ -466,7 +464,6 @@ def _render_message(
     message: str | BetaContentBlockParam | ToolResult,
 ):
     """Convert input from the user or output from the agent to a streamlit message."""
-    # streamlit's hotreloading breaks isinstance checks, so we need to check for class names
     is_tool_result = not isinstance(message, str | dict)
     if not message or (
         is_tool_result
@@ -491,12 +488,10 @@ def _render_message(
             if message["type"] == "text":
                 st.write(message["text"])
             elif message["type"] == "thinking":
-                thinking_content = message.get("thinking", "")
-                st.markdown(f"[Thinking]\n\n{thinking_content}")
+                st.markdown(f"[Thinking]\n\n{message.get('thinking', '')}")
             elif message["type"] == "tool_use":
                 st.code(f'Tool Use: {message["name"]}\nInput: {message["input"]}')
             else:
-                # only expected return types are text and tool_use
                 raise Exception(f'Unexpected response type {message["type"]}')
         else:
             st.markdown(message)
