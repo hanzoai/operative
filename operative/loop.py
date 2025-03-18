@@ -79,7 +79,7 @@ async def sampling_loop(
         text=f"{SYSTEM_PROMPT}{' ' + system_prompt_suffix if system_prompt_suffix else ''}",
     )
 
-    # If provider is Anthropic and thinking is enabled, inject prompt caching.
+    # If using Anthropic with thinking enabled, inject prompt caching.
     if provider == APIProvider.ANTHROPIC and thinking_budget:
         _inject_prompt_caching(messages)
         only_n_most_recent_images = 0
@@ -94,6 +94,14 @@ async def sampling_loop(
     extra_body = {}
     if thinking_budget:
         extra_body = {"thinking": {"type": "enabled", "budget_tokens": thinking_budget}}
+
+    # Set extra_headers to enable computer use beta.
+    extra_headers = {}
+    if provider == APIProvider.ANTHROPIC:
+        if "20250124" in str(tool_version):
+            extra_headers["anthropic-beta"] = "computer-use-2025-01-24"
+        else:
+            extra_headers["anthropic-beta"] = "computer-use-2024-10-22"
 
     # Instantiate the modern asynchronous client.
     if provider == APIProvider.ANTHROPIC:
@@ -116,6 +124,7 @@ async def sampling_loop(
             system=[system],
             tools=tool_collection.to_params(),
             extra_body=extra_body,
+            extra_headers=extra_headers,
         ) as stream:
             assistant_blocks = []
             # Stream incremental text chunks.
