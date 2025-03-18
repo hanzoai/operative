@@ -154,7 +154,7 @@ async def main():
 
     st.markdown(STREAMLIT_STYLE, unsafe_allow_html=True)
 
-    st.title("Hanzo Operator")
+    st.title("Hanzo Operative")
 
     if not os.getenv("HIDE_WARNING", False):
         st.warning(WARNING_TEXT)
