@@ -192,7 +192,7 @@ async def main():
                         _render_message(Sender.TOOL, st.session_state.tools[block["tool_use_id"]])
                     else:
                         _render_message(message["role"], cast(BetaContentBlockParam | ToolResult, block))
-        new_message = st.chat_input("Type a message to send to Operative...")
+        new_message = st.chat_input("Type a message to send to Claude to control the computer...")
         if new_message:
             st.session_state.messages.append({
                 "role": Sender.USER,
@@ -218,6 +218,7 @@ async def main():
     if most_recent_message["role"] is not Sender.USER:
         return
 
+    # Callback for bot output; if thinking is enabled, accumulate streaming thoughts.
     def bot_output_callback(message: BetaContentBlockParam):
         if isinstance(message, dict) and message.get("type") == "thinking":
             current = st.session_state.streaming_thoughts
@@ -365,4 +366,38 @@ def _render_error(error: Exception):
         lines = "\n".join(traceback.format_exception(error))
         body += f"\n\n```{lines}```"
     save_to_storage(f"error_{datetime.now().timestamp()}.md", body)
-    st.error(f"**{
+    st.error(f"**{error.__class__.__name__}**\n\n{body}", icon=":material/error:")
+
+
+def _render_message(sender: Sender, message: str | BetaContentBlockParam | ToolResult):
+    """Convert input from the user or output from the agent to a Streamlit message."""
+    is_tool_result = not isinstance(message, str | dict)
+    if not message or (is_tool_result and st.session_state.hide_images and not hasattr(message, "error") and not hasattr(message, "output")):
+        return
+    with st.chat_message(sender):
+        if is_tool_result:
+            message = cast(ToolResult, message)
+            if message.output:
+                if message.__class__.__name__ == "CLIResult":
+                    st.code(message.output)
+                else:
+                    st.markdown(message.output)
+            if message.error:
+                st.error(message.error)
+            if message.base64_image and not st.session_state.hide_images:
+                st.image(base64.b64decode(message.base64_image))
+        elif isinstance(message, dict):
+            if message["type"] == "text":
+                st.write(message["text"])
+            elif message["type"] == "thinking":
+                st.markdown(f"[Thinking]\n\n{message.get('thinking', '')}")
+            elif message["type"] == "tool_use":
+                st.code(f'Tool Use: {message["name"]}\nInput: {message["input"]}')
+            else:
+                raise Exception(f'Unexpected response type {message["type"]}')
+        else:
+            st.markdown(message)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

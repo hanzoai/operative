@@ -1,6 +1,6 @@
 """
-Agentic sampling loop that calls the Anthropic API using the modern AsyncAnthropic client and
-its streaming response interface.
+Agentic sampling loop that calls the Anthropic API using the modern AsyncAnthropic client
+and its streaming response interface.
 """
 
 import platform
@@ -45,8 +45,8 @@ SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 </SYSTEM_CAPABILITY>
 
 <IMPORTANT>
-* Ignore any Firefox startup wizards – just click the address bar and enter your URL.
-* For PDFs, if you need the full text rather than screenshots, download and convert with pdftotext.
+* Ignore any Firefox startup wizards – simply click the address bar and enter your URL.
+* For PDFs, if you need the full text instead of screenshots, download and convert with pdftotext.
 </IMPORTANT>"""
 
 
@@ -70,6 +70,7 @@ async def sampling_loop(
 ) -> list[BetaMessageParam]:
     """
     Sampling loop using the modern AsyncAnthropic client with streaming.
+    Works with and without thinking enabled.
     """
     tool_group = TOOL_GROUPS_BY_VERSION[tool_version]
     tool_collection = ToolCollection(*(ToolCls() for ToolCls in tool_group.tools))
@@ -84,7 +85,7 @@ async def sampling_loop(
         betas.append("token-efficient-tools-2025-02-19")
     image_truncation_threshold = only_n_most_recent_images or 0
 
-    # Instantiate the modern asynchronous client.
+    # Instantiate the appropriate modern asynchronous client.
     if provider == APIProvider.ANTHROPIC:
         from anthropic import AsyncAnthropic
         client = AsyncAnthropic(api_key=api_key, max_retries=4)
@@ -97,20 +98,18 @@ async def sampling_loop(
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
-    if provider == APIProvider.ANTHROPIC:
-        betas.append(PROMPT_CACHING_BETA_FLAG)
+    # If caching is enabled, add the beta flag and inject cache control.
+    if provider == APIProvider.ANTHROPIC and PROMPT_CACHING_BETA_FLAG in betas:
         _inject_prompt_caching(messages)
-        # When caching is enabled, do not truncate images.
         only_n_most_recent_images = 0
         system["cache_control"] = {"type": "ephemeral"}  # type: ignore
 
     if only_n_most_recent_images:
         _maybe_filter_to_n_most_recent_images(
-            messages,
-            only_n_most_recent_images,
-            min_removal_threshold=image_truncation_threshold,
+            messages, only_n_most_recent_images, min_removal_threshold=image_truncation_threshold
         )
     extra_body = {}
+    # Include thinking parameters only if a budget is provided (and hence thinking is enabled)
     if thinking_budget:
         extra_body = {"thinking": {"type": "enabled", "budget_tokens": thinking_budget}}
 
@@ -131,15 +130,16 @@ async def sampling_loop(
                 block: BetaContentBlockParam = {"type": "text", "text": chunk}
                 output_callback(block)
                 assistant_blocks.append(block)
-            # Obtain the final complete message.
+            # Get the final complete message.
             final_message: BetaMessage = await stream.get_final_message()
     except Exception as e:
+        # Pass None for raw request/response since modern client does not expose them.
         api_response_callback(None, None, e)
         return messages
 
-    # No raw request info available; pass None.
     api_response_callback(None, None, None)
 
+    # Parse the final structured content blocks.
     final_blocks = _response_to_params(final_message)
     for block in final_blocks:
         if block.get("type") == "tool_use":
@@ -159,9 +159,7 @@ async def sampling_loop(
 
 
 def _maybe_filter_to_n_most_recent_images(
-    messages: list[BetaMessageParam],
-    images_to_keep: int,
-    min_removal_threshold: int,
+    messages: list[BetaMessageParam], images_to_keep: int, min_removal_threshold: int
 ):
     """
     Remove older screenshot images from tool result blocks while preserving enough content
