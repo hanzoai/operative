@@ -152,8 +152,8 @@ async def sampling_loop(
         assistant_blocks = []
         tool_result_content = []
 
-        # Process streamed chunks asynchronously.
-        async for raw_chunk in stream_response:
+        # Process streamed chunks
+        for raw_chunk in stream_response:
             chunk = raw_chunk.parse()
             for content_block in chunk:
                 output_callback(content_block)
