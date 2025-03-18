@@ -45,11 +45,6 @@ class APIProvider(StrEnum):
     VERTEX = "vertex"
 
 
-# This system prompt is optimized for the Docker environment in this repository and
-# specific tool combinations enabled.
-# We encourage modifying this system prompt to ensure the model has context for the
-# environment it is running in, and to provide any additional information that may be
-# helpful for the task at hand.
 SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 * You are utilising an Ubuntu virtual machine using {platform.machine()} architecture with internet access.
 * You can feel free to install Ubuntu applications with your bash tool. Use curl instead of wget.
@@ -57,13 +52,13 @@ SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 * Using bash tool you can start GUI applications, but you need to set export DISPLAY=:1 and use a subshell. For example "(DISPLAY=:1 xterm &)".
 * GUI apps run with bash tool will appear within your desktop environment, but they may take some time to appear. Take a screenshot to confirm it did.
 * When using your bash tool with commands that are expected to output very large quantities of text, redirect into a tmp file and use str_replace_editor or `grep -n -B <lines before> -A <lines after> <query> <filename>` to confirm output.
-* When viewing a page it can be helpful to zoom out so that you can see everything on the page.  Either that, or make sure you scroll down to see everything before deciding something isn't available.
-* When using your computer function calls, they take a while to run and send back to you.  Where possible/feasible, try to chain multiple of these calls all into one function calls request.
+* When viewing a page it can be helpful to zoom out so that you can see everything on the page. Either that, or make sure you scroll down to see everything before deciding something isn't available.
+* When using your computer function calls, they take a while to run and send back to you. Where possible/feasible, try to chain multiple of these calls all into one function calls request.
 * The current date is {datetime.today().strftime('%A, %B %-d, %Y')}.
 </SYSTEM_CAPABILITY>
 
 <IMPORTANT>
-* When using Firefox, if a startup wizard appears, IGNORE IT.  Do not even click "skip this step".  Instead, click on the address bar where it says "Search or enter address", and enter the appropriate search term or URL there.
+* When using Firefox, if a startup wizard appears, IGNORE IT. Do not even click "skip this step". Instead, click on the address bar where it says "Search or enter address", and enter the appropriate search term or URL there.
 * If the item you are looking at is a pdf, if after taking a single screenshot of the pdf it seems that you want to read the entire document instead of trying to continue to read the pdf from your screenshots + navigation, determine the URL, use curl to download the pdf, install and use pdftotext to convert it to a text file, and then read that text file directly with your StrReplaceEditTool.
 </IMPORTANT>"""
 
@@ -114,7 +109,7 @@ async def sampling_loop(
         if enable_prompt_caching:
             betas.append(PROMPT_CACHING_BETA_FLAG)
             _inject_prompt_caching(messages)
-            # Because cached reads are 10% of the price, we don't break the cache by truncating images
+            # Do not truncate images when caching is enabled.
             only_n_most_recent_images = 0
             system["cache_control"] = {"type": "ephemeral"}  # type: ignore
 
@@ -130,7 +125,6 @@ async def sampling_loop(
                 "thinking": {"type": "enabled", "budget_tokens": thinking_budget}
             }
 
-        # Call the API in streaming mode by adding stream=True.
         try:
             stream_response = client.beta.messages.with_raw_response.create(
                 max_tokens=max_tokens,
@@ -140,7 +134,7 @@ async def sampling_loop(
                 tools=tool_collection.to_params(),
                 betas=betas,
                 extra_body=extra_body,
-                stream=True,  # enable streaming
+                stream=True,  # enable streaming mode
             )
         except (APIStatusError, APIResponseValidationError) as e:
             api_response_callback(e.request, e.response, e)
@@ -155,15 +149,13 @@ async def sampling_loop(
             None,
         )
 
-        # Initialize accumulators for the assistant response and tool results.
         assistant_blocks = []
         tool_result_content = []
 
-        # Iterate asynchronously over streamed response chunks.
+        # Process streamed chunks asynchronously.
         async for raw_chunk in stream_response:
             chunk = raw_chunk.parse()
             for content_block in chunk:
-                # Immediately call output_callback for each chunk.
                 output_callback(content_block)
                 assistant_blocks.append(content_block)
                 if content_block["type"] == "tool_use":
@@ -175,7 +167,6 @@ async def sampling_loop(
                     tool_output_callback(result, content_block["id"])
                     tool_result_content.append(tool_result)
 
-        # Append the fully streamed assistant message.
         messages.append(
             {
                 "role": "assistant",
@@ -183,7 +174,6 @@ async def sampling_loop(
             }
         )
 
-        # If no tool-use was requested, we can finish the loop.
         if not tool_result_content:
             return messages
 
@@ -196,10 +186,8 @@ def _maybe_filter_to_n_most_recent_images(
     min_removal_threshold: int,
 ):
     """
-    With the assumption that images are screenshots that are of diminishing value as
-    the conversation progresses, remove all but the final `images_to_keep` tool_result
-    images in place, with a chunk of min_removal_threshold to reduce the amount we
-    break the implicit prompt cache.
+    Remove older screenshot images from tool result blocks while preserving
+    enough content to not break the prompt cache.
     """
     if images_to_keep is None:
         return messages
@@ -209,9 +197,7 @@ def _maybe_filter_to_n_most_recent_images(
         [
             item
             for message in messages
-            for item in (
-                message["content"] if isinstance(message["content"], list) else []
-            )
+            for item in (message["content"] if isinstance(message["content"], list) else [])
             if isinstance(item, dict) and item.get("type") == "tool_result"
         ],
     )
@@ -224,7 +210,6 @@ def _maybe_filter_to_n_most_recent_images(
     )
 
     images_to_remove = total_images - images_to_keep
-    # for better cache behavior, we want to remove in chunks
     images_to_remove -= images_to_remove % min_removal_threshold
 
     for tool_result in tool_result_blocks:
@@ -264,21 +249,18 @@ def _inject_prompt_caching(
     messages: list[BetaMessageParam],
 ):
     """
-    Set cache breakpoints for the 3 most recent turns
-    one cache breakpoint is left for tools/system prompt, to be shared across sessions
+    Set cache breakpoints for the three most recent turns.
     """
     breakpoints_remaining = 3
     for message in reversed(messages):
-        if message["role"] == "user" and isinstance(
-            content := message["content"], list
-        ):
+        if message["role"] == "user" and isinstance(message["content"], list):
             if breakpoints_remaining:
                 breakpoints_remaining -= 1
-                content[-1]["cache_control"] = BetaCacheControlEphemeralParam(  # type: ignore
+                message["content"][-1]["cache_control"] = BetaCacheControlEphemeralParam(  # type: ignore
                     {"type": "ephemeral"}
                 )
             else:
-                content[-1].pop("cache_control", None)
+                message["content"][-1].pop("cache_control", None)
                 break
 
 

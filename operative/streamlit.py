@@ -76,7 +76,7 @@ STREAMLIT_STYLE = """
     button[kind=header]:hover {
         background-color: rgb(255, 51, 51);
     }
-     /* Hide the streamlit deploy button */
+    /* Hide the streamlit deploy button */
     .stAppDeployButton {
         visibility: hidden;
     }
@@ -98,13 +98,9 @@ def setup_state():
     if "messages" not in st.session_state:
         st.session_state.messages = []
     if "api_key" not in st.session_state:
-        st.session_state.api_key = load_from_storage("api_key") or os.getenv(
-            "ANTHROPIC_API_KEY", ""
-        )
+        st.session_state.api_key = load_from_storage("api_key") or os.getenv("ANTHROPIC_API_KEY", "")
     if "provider" not in st.session_state:
-        st.session_state.provider = (
-            os.getenv("API_PROVIDER", "anthropic") or APIProvider.ANTHROPIC
-        )
+        st.session_state.provider = os.getenv("API_PROVIDER", "anthropic") or APIProvider.ANTHROPIC
     if "provider_radio" not in st.session_state:
         st.session_state.provider_radio = st.session_state.provider
     if "model" not in st.session_state:
@@ -127,21 +123,17 @@ def setup_state():
         st.session_state.in_sampling_loop = False
     if "thinking_placeholder" not in st.session_state:
         st.session_state.thinking_placeholder = st.empty()
+    if "streaming_thoughts" not in st.session_state:
+        st.session_state.streaming_thoughts = ""
 
 
 def _reset_model():
-    st.session_state.model = PROVIDER_TO_DEFAULT_MODEL_NAME[
-        cast(APIProvider, st.session_state.provider)
-    ]
+    st.session_state.model = PROVIDER_TO_DEFAULT_MODEL_NAME[cast(APIProvider, st.session_state.provider)]
     _reset_model_conf()
 
 
 def _reset_model_conf():
-    model_conf = (
-        SONNET_3_7
-        if "3-7" in st.session_state.model
-        else MODEL_TO_MODEL_CONF.get(st.session_state.model, SONNET_3_5_NEW)
-    )
+    model_conf = SONNET_3_7 if "3-7" in st.session_state.model else MODEL_TO_MODEL_CONF.get(st.session_state.model, SONNET_3_5_NEW)
     st.session_state.tool_version = model_conf.tool_version
     st.session_state.has_thinking = model_conf.has_thinking
     st.session_state.output_tokens = model_conf.default_output_tokens
@@ -154,7 +146,6 @@ async def main():
     setup_state()
 
     st.markdown(STREAMLIT_STYLE, unsafe_allow_html=True)
-
     st.title("Hanzo Operative")
 
     if not os.getenv("HIDE_WARNING", False):
@@ -169,84 +160,42 @@ async def main():
                 st.session_state.auth_validated = False
 
         provider_options = [option.value for option in APIProvider]
-        st.radio(
-            "API Provider",
-            options=provider_options,
-            key="provider_radio",
-            format_func=lambda x: x.title(),
-            on_change=_reset_api_provider,
-        )
-
+        st.radio("API Provider", options=provider_options, key="provider_radio", format_func=lambda x: x.title(), on_change=_reset_api_provider)
         st.text_input("Model", key="model", on_change=_reset_model_conf)
 
         if st.session_state.provider == APIProvider.ANTHROPIC:
-            st.text_input(
-                "Anthropic API Key",
-                type="password",
-                key="api_key",
-                on_change=lambda: save_to_storage("api_key", st.session_state.api_key),
-            )
+            st.text_input("Anthropic API Key", type="password", key="api_key", on_change=lambda: save_to_storage("api_key", st.session_state.api_key))
 
-        st.number_input(
-            "Only send N most recent images",
-            min_value=0,
-            key="only_n_most_recent_images",
-            help="To decrease the total tokens sent, remove older screenshots from the conversation",
-        )
-        st.text_area(
-            "Custom System Prompt Suffix",
-            key="custom_system_prompt",
-            help="Additional instructions to append to the system prompt. see operative/loop.py for the base system prompt.",
-            on_change=lambda: save_to_storage(
-                "system_prompt", st.session_state.custom_system_prompt
-            ),
-        )
+        st.number_input("Only send N most recent images", min_value=0, key="only_n_most_recent_images",
+                        help="To decrease the total tokens sent, remove older screenshots from the conversation")
+        st.text_area("Custom System Prompt Suffix", key="custom_system_prompt",
+                     help="Additional instructions to append to the system prompt. See operative/loop.py for the base system prompt.",
+                     on_change=lambda: save_to_storage("system_prompt", st.session_state.custom_system_prompt))
         st.checkbox("Hide screenshots", key="hide_images")
-        st.checkbox(
-            "Enable token-efficient tools beta", key="token_efficient_tools_beta"
-        )
+        st.checkbox("Enable token-efficient tools beta", key="token_efficient_tools_beta")
         versions = get_args(ToolVersion)
-        st.radio(
-            "Tool Versions",
-            key="tool_versions",
-            options=versions,
-            index=versions.index(st.session_state.tool_version),
-        )
-
+        st.radio("Tool Versions", key="tool_versions", options=versions, index=versions.index(st.session_state.tool_version))
         st.number_input("Max Output Tokens", key="output_tokens", step=1)
-
         st.checkbox("Thinking Enabled", key="thinking", value=False)
-        st.number_input(
-            "Thinking Budget",
-            key="thinking_budget",
-            max_value=st.session_state.max_output_tokens,
-            step=1,
-            disabled=not st.session_state.thinking,
-        )
+        st.number_input("Thinking Budget", key="thinking_budget", max_value=st.session_state.max_output_tokens, step=1, disabled=not st.session_state.thinking)
 
         if st.button("Reset", type="primary"):
             with st.spinner("Resetting..."):
                 st.session_state.clear()
                 setup_state()
-
                 subprocess.run("pkill Xvfb; pkill tint2", shell=True)  # noqa: ASYNC221
                 await asyncio.sleep(1)
                 subprocess.run("./start_all.sh", shell=True)  # noqa: ASYNC221
 
     if not st.session_state.auth_validated:
-        if auth_error := validate_auth(
-            st.session_state.provider, st.session_state.api_key
-        ):
+        if auth_error := validate_auth(st.session_state.provider, st.session_state.api_key):
             st.warning(f"Please resolve the following auth issue:\n\n{auth_error}")
             return
         else:
             st.session_state.auth_validated = True
 
     chat, http_logs = st.tabs(["Chat", "HTTP Exchange Logs"])
-
-    new_message = st.chat_input(
-        "Type a message to send to Claude to control the computer..."
-    )
+    new_message = st.chat_input("Type a message to send to Claude to control the computer...")
 
     with chat:
         # Render past chats.
@@ -256,14 +205,18 @@ async def main():
             elif isinstance(message["content"], list):
                 for block in message["content"]:
                     if isinstance(block, dict) and block["type"] == "tool_result":
-                        _render_message(
-                            Sender.TOOL, st.session_state.tools[block["tool_use_id"]]
-                        )
+                        _render_message(Sender.TOOL, st.session_state.tools[block["tool_use_id"]])
                     else:
-                        _render_message(
-                            message["role"],
-                            cast(BetaContentBlockParam | ToolResult, block),
-                        )
+                        _render_message(message["role"], cast(BetaContentBlockParam | ToolResult, block))
+
+        # Render a button to clear streaming thoughts.
+        if st.button("Clear Streaming Thoughts"):
+            st.session_state.streaming_thoughts = ""
+            st.session_state.thinking_placeholder.empty()
+
+        # Render an expander for streaming thoughts.
+        with st.expander("Show Streaming Thoughts", expanded=False):
+            st.markdown(st.session_state.streaming_thoughts)
 
         # Render past HTTP exchanges.
         for identity, (request, response) in st.session_state.responses.items():
@@ -271,15 +224,10 @@ async def main():
 
         # Render new user message.
         if new_message:
-            st.session_state.messages.append(
-                {
-                    "role": Sender.USER,
-                    "content": [
-                        *maybe_add_interruption_blocks(),
-                        BetaTextBlockParam(type="text", text=new_message),
-                    ],
-                }
-            )
+            st.session_state.messages.append({
+                "role": Sender.USER,
+                "content": [*maybe_add_interruption_blocks(), BetaTextBlockParam(type="text", text=new_message)],
+            })
             _render_message(Sender.USER, new_message)
 
         try:
@@ -290,11 +238,14 @@ async def main():
         if most_recent_message["role"] is not Sender.USER:
             return
 
-        # Define a custom callback for bot output to handle "thinking" messages.
+        # Custom callback to handle bot output.
         def bot_output_callback(message: BetaContentBlockParam):
             if isinstance(message, dict) and message.get("type") == "thinking":
+                # Append new thinking content.
+                current = st.session_state.streaming_thoughts
+                st.session_state.streaming_thoughts = current + message.get("thinking", "") + "\n"
                 st.session_state.thinking_placeholder.markdown(
-                    f"**[Thinking]** {message.get('thinking', '')}"
+                    f"**[Streaming Thoughts]**\n{st.session_state.streaming_thoughts}"
                 )
             else:
                 st.session_state.thinking_placeholder.empty()
@@ -307,21 +258,13 @@ async def main():
                 provider=st.session_state.provider,
                 messages=st.session_state.messages,
                 output_callback=bot_output_callback,
-                tool_output_callback=partial(
-                    _tool_output_callback, tool_state=st.session_state.tools
-                ),
-                api_response_callback=partial(
-                    _api_response_callback,
-                    tab=http_logs,
-                    response_state=st.session_state.responses,
-                ),
+                tool_output_callback=partial(_tool_output_callback, tool_state=st.session_state.tools),
+                api_response_callback=partial(_api_response_callback, tab=http_logs, response_state=st.session_state.responses),
                 api_key=st.session_state.api_key,
                 only_n_most_recent_images=st.session_state.only_n_most_recent_images,
                 tool_version=st.session_state.tool_version,
                 max_tokens=st.session_state.output_tokens,
-                thinking_budget=st.session_state.thinking_budget
-                if st.session_state.thinking
-                else None,
+                thinking_budget=st.session_state.thinking_budget if st.session_state.thinking else None,
                 token_efficient_tools_beta=st.session_state.token_efficient_tools_beta,
             )
 
@@ -331,19 +274,15 @@ def maybe_add_interruption_blocks():
         return []
     result = []
     last_message = st.session_state.messages[-1]
-    previous_tool_use_ids = [
-        block["id"] for block in last_message["content"] if block["type"] == "tool_use"
-    ]
+    previous_tool_use_ids = [block["id"] for block in last_message["content"] if block["type"] == "tool_use"]
     for tool_use_id in previous_tool_use_ids:
         st.session_state.tools[tool_use_id] = ToolResult(error=INTERRUPT_TOOL_ERROR)
-        result.append(
-            BetaToolResultBlockParam(
-                tool_use_id=tool_use_id,
-                type="tool_result",
-                content=INTERRUPT_TOOL_ERROR,
-                is_error=True,
-            )
-        )
+        result.append(BetaToolResultBlockParam(
+            tool_use_id=tool_use_id,
+            type="tool_result",
+            content=INTERRUPT_TOOL_ERROR,
+            is_error=True,
+        ))
     result.append(BetaTextBlockParam(type="text", text=INTERRUPT_TEXT))
     return result
 
@@ -361,19 +300,15 @@ def validate_auth(provider: APIProvider, api_key: str | None):
             return "Enter your Anthropic API key in the sidebar to continue."
     if provider == APIProvider.BEDROCK:
         import boto3
-
         if not boto3.Session().get_credentials():
             return "You must have AWS credentials set up to use the Bedrock API."
     if provider == APIProvider.VERTEX:
         import google.auth
         from google.auth.exceptions import DefaultCredentialsError
-
         if not os.environ.get("CLOUD_ML_REGION"):
             return "Set the CLOUD_ML_REGION environment variable to use the Vertex API."
         try:
-            google.auth.default(
-                scopes=["https://www.googleapis.com/auth/cloud-platform"],
-            )
+            google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
         except DefaultCredentialsError:
             return "Your google cloud credentials are not set up correctly."
 
@@ -414,9 +349,7 @@ def _api_response_callback(
     _render_api_response(request, response, response_id, tab)
 
 
-def _tool_output_callback(
-    tool_output: ToolResult, tool_id: str, tool_state: dict[str, ToolResult]
-):
+def _tool_output_callback(tool_output: ToolResult, tool_id: str, tool_state: dict[str, ToolResult]):
     tool_state[tool_id] = tool_output
     _render_message(Sender.TOOL, tool_output)
 
@@ -430,16 +363,15 @@ def _render_api_response(
     with tab:
         with st.expander(f"Request/Response ({response_id})"):
             newline = "\n\n"
-            st.markdown(
-                f"`{request.method} {request.url}`{newline}{newline.join(f'`{k}: {v}`' for k, v in request.headers.items())}"
-            )
+            st.markdown(f"`{request.method} {request.url}`{newline}{newline.join(f'`{k}: {v}`' for k, v in request.headers.items())}")
             st.json(request.read().decode())
             st.markdown("---")
             if isinstance(response, httpx.Response):
-                st.markdown(
-                    f"`{response.status_code}`{newline}{newline.join(f'`{k}: {v}`' for k, v in response.headers.items())}"
-                )
-                st.json(response.text)
+                st.markdown(f"`{response.status_code}`{newline}{newline.join(f'`{k}: {v}`' for k, v in response.headers.items())}")
+                try:
+                    st.json(response.text)
+                except Exception as e:
+                    st.write("Response content not available due to streaming.")
             else:
                 st.write(response)
 
@@ -448,7 +380,7 @@ def _render_error(error: Exception):
     if isinstance(error, RateLimitError):
         body = "You have been rate limited."
         if retry_after := error.response.headers.get("retry-after"):
-            body += f" **Retry after {str(timedelta(seconds=int(retry_after)))} (HH:MM:SS).** See our API [documentation](https://docs.anthropic.com/en/api/rate-limits) for more details."
+            body += f" **Retry after {str(timedelta(seconds=int(retry_after)))} (HH:MM:SS).** See our API documentation for more details."
         body += f"\n\n{error.message}"
     else:
         body = str(error)
@@ -459,18 +391,10 @@ def _render_error(error: Exception):
     st.error(f"**{error.__class__.__name__}**\n\n{body}", icon=":material/error:")
 
 
-def _render_message(
-    sender: Sender,
-    message: str | BetaContentBlockParam | ToolResult,
-):
+def _render_message(sender: Sender, message: str | BetaContentBlockParam | ToolResult):
     """Convert input from the user or output from the agent to a streamlit message."""
     is_tool_result = not isinstance(message, str | dict)
-    if not message or (
-        is_tool_result
-        and st.session_state.hide_images
-        and not hasattr(message, "error")
-        and not hasattr(message, "output")
-    ):
+    if not message or (is_tool_result and st.session_state.hide_images and not hasattr(message, "error") and not hasattr(message, "output")):
         return
     with st.chat_message(sender):
         if is_tool_result:
