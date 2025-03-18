@@ -79,13 +79,23 @@ async def sampling_loop(
         text=f"{SYSTEM_PROMPT}{' ' + system_prompt_suffix if system_prompt_suffix else ''}",
     )
 
-    # Setup beta flags and image truncation.
-    betas = [tool_group.beta_flag] if tool_group.beta_flag else []
-    if token_efficient_tools_beta:
-        betas.append("token-efficient-tools-2025-02-19")
-    image_truncation_threshold = only_n_most_recent_images or 0
+    # If provider is Anthropic and thinking is enabled, inject prompt caching.
+    if provider == APIProvider.ANTHROPIC and thinking_budget:
+        _inject_prompt_caching(messages)
+        only_n_most_recent_images = 0
+        system["cache_control"] = {"type": "ephemeral"}  # type: ignore
 
-    # Instantiate the appropriate modern asynchronous client.
+    if only_n_most_recent_images:
+        _maybe_filter_to_n_most_recent_images(
+            messages,
+            only_n_most_recent_images,
+            min_removal_threshold=only_n_most_recent_images,
+        )
+    extra_body = {}
+    if thinking_budget:
+        extra_body = {"thinking": {"type": "enabled", "budget_tokens": thinking_budget}}
+
+    # Instantiate the modern asynchronous client.
     if provider == APIProvider.ANTHROPIC:
         from anthropic import AsyncAnthropic
         client = AsyncAnthropic(api_key=api_key, max_retries=4)
@@ -98,21 +108,6 @@ async def sampling_loop(
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
-    # If caching is enabled, add the beta flag and inject cache control.
-    if provider == APIProvider.ANTHROPIC and PROMPT_CACHING_BETA_FLAG in betas:
-        _inject_prompt_caching(messages)
-        only_n_most_recent_images = 0
-        system["cache_control"] = {"type": "ephemeral"}  # type: ignore
-
-    if only_n_most_recent_images:
-        _maybe_filter_to_n_most_recent_images(
-            messages, only_n_most_recent_images, min_removal_threshold=image_truncation_threshold
-        )
-    extra_body = {}
-    # Include thinking parameters only if a budget is provided (and hence thinking is enabled)
-    if thinking_budget:
-        extra_body = {"thinking": {"type": "enabled", "budget_tokens": thinking_budget}}
-
     try:
         async with client.messages.with_streaming_response.create(
             max_tokens=max_tokens,
@@ -120,26 +115,22 @@ async def sampling_loop(
             model=model,
             system=[system],
             tools=tool_collection.to_params(),
-            betas=betas,
             extra_body=extra_body,
         ) as stream:
             assistant_blocks = []
-            tool_result_content = []
             # Stream incremental text chunks.
             async for chunk in stream.text_stream:
                 block: BetaContentBlockParam = {"type": "text", "text": chunk}
                 output_callback(block)
                 assistant_blocks.append(block)
-            # Get the final complete message.
+            # Obtain the final complete message.
             final_message: BetaMessage = await stream.get_final_message()
     except Exception as e:
-        # Pass None for raw request/response since modern client does not expose them.
         api_response_callback(None, None, e)
         return messages
 
     api_response_callback(None, None, None)
 
-    # Parse the final structured content blocks.
     final_blocks = _response_to_params(final_message)
     for block in final_blocks:
         if block.get("type") == "tool_use":
@@ -149,12 +140,7 @@ async def sampling_loop(
             )
             tool_result = _make_api_tool_result(result, block["id"])
             tool_output_callback(result, block["id"])
-            tool_result_content.append(tool_result)
-
     messages.append({"role": "assistant", "content": final_blocks})
-    if not tool_result_content:
-        return messages
-    messages.append({"content": tool_result_content, "role": "user"})
     return messages
 
 

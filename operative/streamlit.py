@@ -137,7 +137,8 @@ async def main():
     setup_state()
     st.markdown(STREAMLIT_STYLE, unsafe_allow_html=True)
     st.title("Hanzo Operative")
-    if not os.getenv("HIDE_WARNING", False):
+
+    if os.getenv("SHOW_WARNING", True):
         st.warning(WARNING_TEXT)
 
     with st.sidebar:
@@ -180,7 +181,7 @@ async def main():
             st.session_state.auth_validated = True
 
     # Create three tabs: Chat, HTTP Exchange Logs, and Streaming Thoughts.
-    chat_tab, http_logs_tab, streaming_tab = st.tabs(["Chat", "HTTP Exchange Logs", "Streaming Thoughts"])
+    chat_tab, http_logs_tab, streaming_tab = st.tabs(["Chat", "HTTP Logs", "Thinking Stream"])
 
     with chat_tab:
         for message in st.session_state.messages:
@@ -218,7 +219,6 @@ async def main():
     if most_recent_message["role"] is not Sender.USER:
         return
 
-    # Callback for bot output; if thinking is enabled, accumulate streaming thoughts.
     def bot_output_callback(message: BetaContentBlockParam):
         if isinstance(message, dict) and message.get("type") == "thinking":
             current = st.session_state.streaming_thoughts
