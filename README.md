@@ -46,7 +46,7 @@ docker run \
     -p 8501:8501 \
     -p 6080:6080 \
     -p 8080:8080 \
-    -it ghcr.io/anthropics/anthropic-quickstarts:computer-use-demo-latest
+    -it ghcr.io/hanzoai/operator:latest
 ```
 
 Once the container is running, see the [Accessing the demo app](#accessing-the-demo-app) section below for instructions on how to connect to the interface.
@@ -73,7 +73,7 @@ docker run \
     -p 8501:8501 \
     -p 6080:6080 \
     -p 8080:8080 \
-    -it ghcr.io/anthropics/anthropic-quickstarts:computer-use-demo-latest
+    -it ghcr.io/hanzoai/operator:latest
 ```
 
 Once the container is running, see the [Accessing the demo app](#accessing-the-demo-app) section below for instructions on how to connect to the interface.
@@ -95,7 +95,7 @@ docker run \
     -p 8501:8501 \
     -p 6080:6080 \
     -p 8080:8080 \
-    -it ghcr.io/anthropics/anthropic-quickstarts:computer-use-demo-latest
+    -it ghcr.io/hanzoai/operator:latest
 ```
 
 Once the container is running, see the [Accessing the demo app](#accessing-the-demo-app) section below for instructions on how to connect to the interface.
@@ -152,7 +152,7 @@ docker run \
     -p 8080:8080 \
     -e WIDTH=1920 \
     -e HEIGHT=1080 \
-    -it ghcr.io/anthropics/anthropic-quickstarts:computer-use-demo-latest
+    -it ghcr.io/hanzoai/operator:latest
 ```
 
 We do not recommend sending screenshots in resolutions above [XGA/WXGA](https://en.wikipedia.org/wiki/Display_resolution_standards#XGA) to avoid issues related to [image resizing](https://docs.anthropic.com/en/docs/build-with-claude/vision#evaluate-image-size).
@@ -177,7 +177,7 @@ docker run \
     -p 8501:8501 \
     -p 6080:6080 \
     -p 8080:8080 \
-    -it computer-use-demo:local  # can also use ghcr.io/anthropics/anthropic-quickstarts:computer-use-demo-latest
+    -it operator:local # can also use ghcr.io/hanzoai/operator:latest
 ```
 
 The docker run command above mounts the repo inside the docker image, such that you can edit files from the host. Streamlit is already configured with auto reloading.

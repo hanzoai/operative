@@ -3,6 +3,7 @@ FROM docker.io/ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBIAN_PRIORITY=high
 
+# Install base packages
 RUN apt-get update && \
     apt-get -y upgrade && \
     apt-get -y install \
@@ -17,7 +18,7 @@ RUN apt-get update && \
     x11vnc \
     # Python/pyenv reqs
     build-essential \
-    libssl-dev  \
+    libssl-dev \
     zlib1g-dev \
     libbz2-dev \
     libreadline-dev \
@@ -56,29 +57,34 @@ RUN git clone --branch v1.5.0 https://github.com/novnc/noVNC.git /opt/noVNC && \
     git clone --branch v0.12.0 https://github.com/novnc/websockify /opt/noVNC/utils/websockify && \
     ln -s /opt/noVNC/vnc.html /opt/noVNC/index.html
 
-# setup user
+# Setup user
 ENV USERNAME=operator
 ENV HOME=/home/$USERNAME
-RUN useradd -m -s /bin/bash -d $HOME $USERNAME
+
+# Use a different group to avoid conflict with existing 'operator' group
+RUN useradd -m -s /bin/bash -d "$HOME" -g users "$USERNAME"
 RUN echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
 USER operator
 WORKDIR $HOME
 
-# setup python
+# Setup pyenv
 RUN git clone https://github.com/pyenv/pyenv.git ~/.pyenv && \
     cd ~/.pyenv && src/configure && make -C src && cd .. && \
     echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc && \
     echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc && \
     echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+
 ENV PYENV_ROOT="$HOME/.pyenv"
 ENV PATH="$PYENV_ROOT/bin:$PATH"
 ENV PYENV_VERSION_MAJOR=3
 ENV PYENV_VERSION_MINOR=11
 ENV PYENV_VERSION_PATCH=6
 ENV PYENV_VERSION=$PYENV_VERSION_MAJOR.$PYENV_VERSION_MINOR.$PYENV_VERSION_PATCH
+
 RUN eval "$(pyenv init -)" && \
-    pyenv install $PYENV_VERSION && \
-    pyenv global $PYENV_VERSION && \
+    pyenv install "$PYENV_VERSION" && \
+    pyenv global "$PYENV_VERSION" && \
     pyenv rehash
 
 ENV PATH="$HOME/.pyenv/shims:$HOME/.pyenv/bin:$PATH"
@@ -86,11 +92,11 @@ ENV PATH="$HOME/.pyenv/shims:$HOME/.pyenv/bin:$PATH"
 RUN python -m pip install --upgrade pip==23.1.2 setuptools==58.0.4 wheel==0.40.0 && \
     python -m pip config set global.disable-pip-version-check true
 
-# only reinstall if requirements.txt changes
+# Only reinstall if requirements.txt changes
 COPY --chown=$USERNAME:$USERNAME operator/requirements.txt $HOME/operator/requirements.txt
-RUN python -m pip install -r $HOME/operator/requirements.txt
+RUN python -m pip install -r "$HOME/operator/requirements.txt"
 
-# setup desktop env & app
+# Copy desktop environment/app files
 COPY --chown=$USERNAME:$USERNAME image/ $HOME
 COPY --chown=$USERNAME:$USERNAME operator/ $HOME/operator/
 
