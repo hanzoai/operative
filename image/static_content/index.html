@@ -28,14 +28,9 @@
     </head>
     <body>
         <div class="container">
-            <iframe
-                src="https://operative-app.hanzo.ai"
-                class="left"
-                allow="fullscreen"
-            ></iframe>
+            <iframe id="app" class="left" allow="fullscreen"></iframe>
             <iframe
                 id="vnc"
-                src="https://operative-vnc.hanzo.ai/vnc.html?&resize=scale&autoconnect=1&view_only=1&reconnect=1&reconnect_delay=2000"
                 class="right"
                 allow="fullscreen"
             ></iframe>
@@ -45,28 +40,34 @@
             >
                 Toggle Screen Control (Off)
             </button>
-            <script>
-                document
-                    .getElementById("toggleViewOnly")
-                    .addEventListener("click", function () {
-                        var vncIframe = document.getElementById("vnc");
-                        var button = document.getElementById("toggleViewOnly");
-                        var currentSrc = vncIframe.src;
-                        if (currentSrc.includes("view_only=1")) {
-                            vncIframe.src = currentSrc.replace(
-                                "view_only=1",
-                                "view_only=0",
-                            );
-                            button.innerText = "Toggle Screen Control (On)";
-                        } else {
-                            vncIframe.src = currentSrc.replace(
-                                "view_only=0",
-                                "view_only=1",
-                            );
-                            button.innerText = "Toggle Screen Control (Off)";
-                        }
-                    });
-            </script>
         </div>
+        <script>
+            // Set endpoint URLs based on host.
+            const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+            const appUrl = isLocal
+                ? 'http://localhost:8501'
+                : 'https://operative-app.hanzo.ai';
+            const vncUrl = isLocal
+                ? 'http://localhost:6080/vnc.html?resize=scale&autoconnect=1&view_only=1&reconnect=1&reconnect_delay=2000'
+                : 'https://operative-vnc.hanzo.ai/vnc.html?resize=scale&autoconnect=1&view_only=1&reconnect=1&reconnect_delay=2000';
+
+            // Set the iframe sources.
+            document.getElementById('app').src = appUrl;
+            document.getElementById('vnc').src = vncUrl;
+
+            // Toggle view_only parameter in VNC iframe.
+            document.getElementById("toggleViewOnly").addEventListener("click", function () {
+                var vncIframe = document.getElementById("vnc");
+                var button = document.getElementById("toggleViewOnly");
+                var currentSrc = vncIframe.src;
+                if (currentSrc.includes("view_only=1")) {
+                    vncIframe.src = currentSrc.replace("view_only=1", "view_only=0");
+                    button.innerText = "Toggle Screen Control (On)";
+                } else {
+                    vncIframe.src = currentSrc.replace("view_only=0", "view_only=1");
+                    button.innerText = "Toggle Screen Control (Off)";
+                }
+            });
+        </script>
     </body>
 </html>
