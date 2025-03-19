@@ -16,4 +16,9 @@ ENV DISPLAY_NUM=$DISPLAY_NUM
 ENV HEIGHT=$HEIGHT
 ENV WIDTH=$WIDTH
 
+# Default endpoints (can be overridden at runtime)
+ENV APP_ENDPOINT=operative-app.hanzo.ai
+ENV VNC_ENDPOINT=operative-vnc.hanzo.ai
+ENV API_ENDPOINT=api.hanzo.ai
+
 ENTRYPOINT [ "./entrypoint.sh" ]
