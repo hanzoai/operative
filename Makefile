@@ -2,13 +2,13 @@
 
 # Build the Docker images
 build:
-	docker build -t ghcr.io/hanzoai/operative:latest .
+	docker build -f docker/Dockerfile -t ghcr.io/hanzoai/operative:latest .
 
 build-desktop:
-	docker build -f Dockerfile.os -t ghcr.io/hanzoai/desktop:latest .
+	docker build -f docker/Dockerfile.desktop -t ghcr.io/hanzoai/desktop:latest .
 
 build-xvfb:
-	docker build -f Dockerfile.xvfb -t ghcr.io/hanzoai/xvfb:latest .
+	docker build -f docker/Dockerfile.xvfb -t ghcr.io/hanzoai/xvfb:latest .
 
 # Push the Docker images to the registry
 push:
