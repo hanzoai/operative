@@ -137,7 +137,6 @@ async def main():
     setup_state()
     st.markdown(STREAMLIT_STYLE, unsafe_allow_html=True)
     st.title("Hanzo Operative")
-
     if os.getenv("SHOW_WARNING", True):
         st.warning(WARNING_TEXT)
 
@@ -163,8 +162,15 @@ async def main():
         versions = get_args(ToolVersion)
         st.radio("Tool Versions", key="tool_versions", options=versions, index=versions.index(st.session_state.tool_version))
         st.number_input("Max Output Tokens", key="output_tokens", step=1)
+        # Allow the user to enable thinking and set a thinking budget.
         st.checkbox("Thinking Enabled", key="thinking", value=False)
-        st.number_input("Thinking Budget", key="thinking_budget", max_value=st.session_state.max_output_tokens, step=1, disabled=not st.session_state.thinking)
+        st.number_input(
+            "Thinking Budget",
+            key="thinking_budget",
+            max_value=st.session_state.max_output_tokens,
+            step=1,
+            disabled=not st.session_state.thinking
+        )
         if st.button("Reset", type="primary"):
             with st.spinner("Resetting..."):
                 st.session_state.clear()
@@ -181,7 +187,7 @@ async def main():
             st.session_state.auth_validated = True
 
     # Create three tabs: Chat, HTTP Exchange Logs, and Streaming Thoughts.
-    chat_tab, http_logs_tab, streaming_tab = st.tabs(["Chat", "HTTP Logs", "Thinking Stream"])
+    chat_tab, http_logs_tab, streaming_tab = st.tabs(["Chat", "HTTP Logs", "Thinking Logs"])
 
     with chat_tab:
         for message in st.session_state.messages:
