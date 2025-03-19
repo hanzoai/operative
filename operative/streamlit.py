@@ -215,7 +215,7 @@ async def main():
             return
         st.session_state.auth_validated = True
 
-    chat_tab, http_logs_tab, streaming_tab = st.tabs(["Chat", "HTTP Logs", "Streaming Thoughts"])
+    chat_tab, http_logs_tab, streaming_tab = st.tabs(["Chat", "HTTP Logs", "Thinking Logs"])
 
     with chat_tab:
         for message in st.session_state.messages:
@@ -241,10 +241,10 @@ async def main():
 
     with streaming_tab:
         streaming_placeholder = st.empty()
-        if st.button("Clear Streaming Thoughts", key="clear_streaming"):
+        if st.button("Clear Thinking Logs", key="clear_streaming"):
             st.session_state.streaming_thoughts = ""
             streaming_placeholder.empty()
-        streaming_placeholder.markdown(f"**[Streaming Thoughts]**\n{st.session_state.streaming_thoughts}")
+        streaming_placeholder.markdown(f"**[Thinking Logs]**\n{st.session_state.streaming_thoughts}")
 
     try:
         last_msg = st.session_state.messages[-1]
@@ -426,7 +426,8 @@ def _render_message(sender: Sender, msg: str | BetaContentBlockParam | ToolResul
                 st.image(base64.b64decode(msg.base64_image))
         elif isinstance(msg, dict):
             if msg.get("type") == "text":
-                st.write(msg.get("text", ""))
+                text = msg.get("text", "")
+                st.markdown(text)
             elif msg.get("type") == "thinking":
                 st.markdown(f"**[Thinking]**\n\n{msg.get('thinking', '')}")
             elif msg.get("type") == "tool_use":
