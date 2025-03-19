@@ -29,11 +29,7 @@
     <body>
         <div class="container">
             <iframe id="app" class="left" allow="fullscreen"></iframe>
-            <iframe
-                id="vnc"
-                class="right"
-                allow="fullscreen"
-            ></iframe>
+            <iframe id="vnc" class="right" allow="fullscreen"></iframe>
             <button
                 id="toggleViewOnly"
                 style="position: absolute; top: 10px; right: 10px; z-index: 1000"
@@ -42,52 +38,48 @@
             </button>
         </div>
         <script>
-            // Set endpoint URLs based on host.
+            // Default endpoints
+            let appEndpoint = 'operative-app.hanzo.ai';
+            let vncEndpoint = 'operative-vnc.hanzo.ai';
             const isLocal = ['localhost', '127.0.0.1'].includes(window.location.hostname);
             
-            // Fetch environment variables from server
-            fetch('/env-config.json')
-                .then(response => response.json())
-                .then(envConfig => {
-                    // Use environment variables or fallback to defaults
-                    const appEndpoint = envConfig.APP_ENDPOINT || 'operative-app.hanzo.ai';
-                    const vncEndpoint = envConfig.VNC_ENDPOINT || 'operative-vnc.hanzo.ai';
-                    
-                    const appUrl = isLocal
-                        ? 'http://localhost:8501'
-                        : `https://${appEndpoint}`;
-                    const vncUrl = isLocal
-                        ? 'http://localhost:6080/vnc.html?resize=scale&autoconnect=1&view_only=1&reconnect=1&reconnect_delay=2000'
-                        : `https://${vncEndpoint}/vnc.html?resize=scale&autoconnect=1&view_only=1&reconnect=1&reconnect_delay=2000`;
+            // Load the iframes with default or local URLs initially
+            function loadIframes() {
+                const appUrl = isLocal
+                    ? 'http://localhost:8501'
+                    : `https://${appEndpoint}`;
+                const vncUrl = isLocal
+                    ? 'http://localhost:6080/vnc.html?resize=scale&autoconnect=1&view_only=1&reconnect=1&reconnect_delay=2000'
+                    : `https://${vncEndpoint}/vnc.html?resize=scale&autoconnect=1&view_only=1&reconnect=1&reconnect_delay=2000`;
 
-                    // Set the iframe sources.
-                    document.getElementById('app').src = appUrl;
-                    document.getElementById('vnc').src = vncUrl;
-                })
-                .catch(error => {
-                    console.error('Failed to fetch environment config:', error);
-                    
-                    // Fallback to default endpoints
-                    const appEndpoint = 'operative-app.hanzo.ai';
-                    const vncEndpoint = 'operative-vnc.hanzo.ai';
-                    
-                    const appUrl = isLocal
-                        ? 'http://localhost:8501'
-                        : `https://${appEndpoint}`;
-                    const vncUrl = isLocal
-                        ? 'http://localhost:6080/vnc.html?resize=scale&autoconnect=1&view_only=1&reconnect=1&reconnect_delay=2000'
-                        : `https://${vncEndpoint}/vnc.html?resize=scale&autoconnect=1&view_only=1&reconnect=1&reconnect_delay=2000`;
+                document.getElementById('app').src = appUrl;
+                document.getElementById('vnc').src = vncUrl;
+            }
+            
+            // Try to fetch environment config and update endpoints if available
+            if (!isLocal) {
+                fetch('/env-config.json')
+                    .then(response => response.json())
+                    .then(config => {
+                        if (config.APP_ENDPOINT) appEndpoint = config.APP_ENDPOINT;
+                        if (config.VNC_ENDPOINT) vncEndpoint = config.VNC_ENDPOINT;
+                        loadIframes();
+                    })
+                    .catch(() => {
+                        // Use defaults if fetch fails
+                        loadIframes();
+                    });
+            } else {
+                // Just use localhost URLs for local development
+                loadIframes();
+            }
 
-                    // Set the iframe sources.
-                    document.getElementById('app').src = appUrl;
-                    document.getElementById('vnc').src = vncUrl;
-                });
-
-            // Toggle view_only parameter in VNC iframe.
-            document.getElementById("toggleViewOnly").addEventListener("click", function () {
-                var vncIframe = document.getElementById("vnc");
-                var button = document.getElementById("toggleViewOnly");
-                var currentSrc = vncIframe.src;
+            // Toggle view_only parameter in VNC iframe
+            document.getElementById("toggleViewOnly").addEventListener("click", function() {
+                const vncIframe = document.getElementById("vnc");
+                const button = document.getElementById("toggleViewOnly");
+                const currentSrc = vncIframe.src;
+                
                 if (currentSrc.includes("view_only=1")) {
                     vncIframe.src = currentSrc.replace("view_only=1", "view_only=0");
                     button.innerText = "Toggle Screen Control (On)";

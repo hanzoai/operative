@@ -13,14 +13,13 @@ class EnvAwareHandler(SimpleHTTPRequestHandler):
         if self.path == "/env-config.json":
             self.send_response(200)
             self.send_header("Content-type", "application/json")
-            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             
-            # Get environment variables to expose to the client
+            # Only expose the endpoints we need for the UI
             env_vars = {
-                "APP_ENDPOINT": os.environ.get("APP_ENDPOINT", ""),
-                "VNC_ENDPOINT": os.environ.get("VNC_ENDPOINT", ""),
-                "API_ENDPOINT": os.environ.get("API_ENDPOINT", "")
+                "APP_ENDPOINT": os.environ.get("APP_ENDPOINT", "operative-app.hanzo.ai"),
+                "VNC_ENDPOINT": os.environ.get("VNC_ENDPOINT", "operative-vnc.hanzo.ai")
             }
             
             self.wfile.write(json.dumps(env_vars).encode())
