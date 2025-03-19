@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=hanzoai/desktop:latest
+ARG BASE_IMAGE=hanzoai/xfvb:latest
 FROM ${BASE_IMAGE}
 
 # Only reinstall if requirements.txt changes

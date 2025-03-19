@@ -1,7 +1,7 @@
 .PHONY: build build-desktop build-xvfb push push-desktop push-xvfb run run-desktop run-xvfb all all-desktop all-xvfb
 
 # Build the Docker images
-build:
+build: build-xvfb
 	docker build -f docker/Dockerfile -t ghcr.io/hanzoai/operative:latest .
 
 build-desktop:
@@ -11,7 +11,7 @@ build-xvfb:
 	docker build -f docker/Dockerfile.xvfb -t ghcr.io/hanzoai/xvfb:latest .
 
 # Push the Docker images to the registry
-push:
+push: push-xvfb
 	docker push ghcr.io/hanzoai/operative:latest
 
 push-desktop:

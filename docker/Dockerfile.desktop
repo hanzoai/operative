@@ -3,38 +3,58 @@ FROM docker.io/ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBIAN_PRIORITY=high
 
-# Install desktop environment and required packages
-RUN apt-get update && \
-    apt-get -y upgrade && \
-    apt-get -y install \
-    xfce4 \
-    xfce4-terminal \
-    xterm \
-    xdotool \
-    scrot \
-    imagemagick \
-    sudo \
-    x11vnc \
-    # Python/pyenv reqs
-    build-essential \
-    libssl-dev \
-    zlib1g-dev \
-    libbz2-dev \
-    libreadline-dev \
-    libsqlite3-dev \
-    curl \
-    git \
-    libncursesw5-dev \
-    xz-utils \
-    tk-dev \
-    libxml2-dev \
-    libxmlsec1-dev \
-    libffi-dev \
-    liblzma-dev \
-    # Network tools
-    net-tools \
-    netcat && \
-    apt-get clean
+# Install Budgie desktop, GDM3, core tools, ML tools, macOS theming, and general dev tools
+RUN apt-get update && apt-get -y upgrade && apt-get -y install \
+    ubuntu-budgie-desktop gdm3 gnome-terminal xterm zsh fish \
+    xdotool scrot imagemagick sudo x11vnc dbus-x11 xauth \
+    build-essential libfuse2 libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
+    curl git libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev \
+    net-tools netcat gnome-tweaks arc-theme fonts-firacode fonts-inter-variable papirus-icon-theme \
+    plank unzip python3 python3-pip python3-venv \
+    docker.io docker-compose ripgrep fd-find htop btop jq fzf bat tmux socat tree \
+    gtk2-engines-murrine gtk2-engines-pixbuf sassc meson ninja-build gnome-themes-extra libglib2.0-dev-bin gnome-shell-extensions \
+    linux-source linux-headers-generic linux-image-generic \
+    software-properties-common lsb-release gpg gnupg chromium-browser \
+    sqlite3 postgresql postgresql-client mariadb-server mariadb-client redis-server \
+    && apt-get clean
+
+# Install VS Code
+RUN wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
+RUN sudo install -D -o root -g root -m 644 packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
+RUN echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" |sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null && rm -f packages.microsoft.gpg
+RUN sudo apt-get install apt-transport-https && sudo apt-get update && sudo apt-get install code
+
+# MongoDB official install
+RUN curl -fsSL https://pgp.mongodb.com/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg && \
+    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list && \
+    apt-get update && apt-get install -y mongodb-org
+
+# Install bun, deno, curlie, glow manually
+RUN curl -fsSL https://bun.sh/install | bash
+RUN curl -fsSL https://deno.land/install.sh | sh
+RUN curl -sS https://webinstall.dev/curlie | bash
+RUN sudo mkdir -p /etc/apt/keyrings
+RUN curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
+RUN echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
+RUN sudo apt update && sudo apt install glow
+
+# Install Colima for containerized dev environments
+RUN curl -LO https://github.com/abiosoft/colima/releases/latest/download/colima-linux-amd64 && \
+    install -m 755 colima-linux-amd64 /usr/local/bin/colima && rm colima-linux-amd64
+
+# Machine Learning essentials - PyTorch, Jupyter, NumPy, Pandas, etc.
+RUN python3 -m pip install --upgrade pip && \
+    python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    python3 -m pip install jupyterlab notebook numpy pandas scikit-learn matplotlib seaborn plotly tqdm transformers datasets ipywidgets
+
+# Clone themes and icons
+RUN mkdir -p /usr/share/themes/ && \
+    wget -O /tmp/WhiteSur.tar.xz https://github.com/vinceliuice/WhiteSur-gtk-theme/archive/refs/tags/2024-11-18.tar.gz && \
+    tar -xf /tmp/WhiteSur.tar.xz -C /usr/share/themes/
+
+RUN mkdir -p /usr/share/icons/ && \
+    wget -O /tmp/WhiteSur-icons.tar.xz https://github.com/vinceliuice/WhiteSur-icon-theme/archive/refs/tags/v2025-02-10.tar.gz && \
+    tar -xf /tmp/WhiteSur-icons.tar.xz -C /usr/share/icons/
 
 # Install noVNC
 RUN git clone --branch v1.5.0 https://github.com/novnc/noVNC.git /opt/noVNC && \
@@ -45,8 +65,8 @@ RUN git clone --branch v1.5.0 https://github.com/novnc/noVNC.git /opt/noVNC && \
 ENV USERNAME=operative
 ENV HOME=/home/$USERNAME
 
-RUN useradd -m -s /bin/bash -d "$HOME" -g users "$USERNAME"
-RUN echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+RUN useradd -m -s /bin/bash -d "$HOME" -g users "$USERNAME" && \
+    echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 USER operative
 WORKDIR $HOME
@@ -75,4 +95,19 @@ ENV PATH="$HOME/.pyenv/shims:$HOME/.pyenv/bin:$PATH"
 RUN python -m pip install --upgrade pip==23.1.2 setuptools==58.0.4 wheel==0.40.0 && \
     python -m pip config set global.disable-pip-version-check true
 
-ENTRYPOINT ["startxfce4"]
+# Set up Plank autostart (macOS dock feel)
+RUN mkdir -p /home/operative/.config/autostart && \
+    echo -e '[Desktop Entry]\nType=Application\nExec=plank\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\nName=Plank' > /home/operative/.config/autostart/plank.desktop
+
+# Set solid black background
+USER root
+RUN sudo -u operative gsettings set org.gnome.desktop.background picture-options 'none' && \
+    sudo -u operative gsettings set org.gnome.desktop.background primary-color '#000000' && \
+    sudo -u operative gsettings set org.gnome.desktop.background color-shading-type 'solid' && \
+    sudo -u operative gsettings set org.gnome.desktop.interface font-name 'Inter Variable 11'
+
+# Enable GDM3 service
+RUN systemctl enable gdm3
+
+# Suggest runtime entrypoint for dev tools / themes
+ENTRYPOINT ["/usr/sbin/gdm3"]
