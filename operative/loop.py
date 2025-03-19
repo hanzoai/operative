@@ -38,6 +38,7 @@ from .tools import (
 )
 
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
+OUTPUT_128K_BETA_FLAG = "output-128k-2025-02-19"
 
 # This system prompt is optimized for the Docker environment in this repository and
 # specific tool combinations enabled.
@@ -103,6 +104,8 @@ async def sampling_loop(
         betas = [tool_group.beta_flag] if tool_group.beta_flag else []
         if token_efficient_tools_beta:
             betas.append("token-efficient-tools-2025-02-19")
+        # Add the 128K output tokens beta flag
+        betas.append(OUTPUT_128K_BETA_FLAG)
         image_truncation_threshold = only_n_most_recent_images or 0
         if provider == APIProvider.ANTHROPIC:
             client = AsyncAnthropic(api_key=api_key, max_retries=4)
