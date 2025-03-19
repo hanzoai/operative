@@ -143,8 +143,8 @@ async def main():
 
     st.title("Hanzo Operative")
 
-    if os.getenv("SHOW_WARNING", True):
-        st.warning(WARNING_TEXT)
+    #if os.getenv("SHOW_WARNING", True):
+    #    st.warning(WARNING_TEXT)
 
     with st.sidebar:
 

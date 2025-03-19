@@ -7,13 +7,13 @@ import platform
 from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, cast
+from typing import cast, Any
 
 import httpx
 from anthropic import (
-    Anthropic,
-    AnthropicBedrock,
-    AnthropicVertex,
+    AsyncAnthropic,
+    AsyncAnthropicBedrock,
+    AsyncAnthropicVertex,
     APIError,
     APIResponseValidationError,
     APIStatusError,
@@ -60,8 +60,6 @@ SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
 * If the item you are looking at is a pdf, if after taking a single screenshot of the pdf it seems that you want to read the entire document instead of trying to continue to read the pdf from your screenshots + navigation, determine the URL, use curl to download the pdf, install and use pdftotext to convert it to a text file, and then read that text file directly with your StrReplaceEditTool.
 </IMPORTANT>"""
 
-
-
 class APIProvider(StrEnum):
     ANTHROPIC = "anthropic"
     BEDROCK = "bedrock"
@@ -75,7 +73,9 @@ async def sampling_loop(
     messages: list[dict],
     output_callback: Callable[[BetaContentBlockParam], None],
     tool_output_callback: Callable[[ToolResult, str], None],
-    api_response_callback: Callable[[httpx.Request | None, httpx.Response | object | None, Exception | None], None],
+    api_response_callback: Callable[
+        [httpx.Request | None, httpx.Response | object | None, Exception | None], None
+    ],
     api_key: str,
     only_n_most_recent_images: int | None = None,
     max_tokens: int = 4096,
@@ -101,12 +101,12 @@ async def sampling_loop(
             betas.append("token-efficient-tools-2025-02-19")
         image_truncation_threshold = only_n_most_recent_images or 0
         if provider == APIProvider.ANTHROPIC:
-            client = Anthropic(api_key=api_key, max_retries=4)
+            client = AsyncAnthropic(api_key=api_key, max_retries=4)
             enable_prompt_caching = True
         elif provider == APIProvider.VERTEX:
-            client = AnthropicVertex()
+            client = AsyncAnthropicVertex()
         elif provider == APIProvider.BEDROCK:
-            client = AnthropicBedrock()
+            client = AsyncAnthropicBedrock()
 
         if enable_prompt_caching:
             betas.append(PROMPT_CACHING_BETA_FLAG)
@@ -123,47 +123,67 @@ async def sampling_loop(
                 only_n_most_recent_images,
                 min_removal_threshold=image_truncation_threshold,
             )
-        extra_body = {}
+
+        kwargs = {
+            "max_tokens": max_tokens,
+            "messages":   messages,
+            "model":      model,
+            "system":     [system],
+            "tools":      tool_collection.to_params(),
+            "betas":      betas,
+        }
+
+        # Configure thinking parameter
         if thinking_budget:
-            # Ensure we only send the required fields for thinking
-            extra_body = {
-                "thinking": {"type": "enabled", "budget_tokens": thinking_budget}
-            }
+            kwargs["thinking"] = {"type": "enabled", "budget": {"tokens": thinking_budget}}
 
         # Call the API
-        # we use raw_response to provide debug information to streamlit. Your
-        # implementation may be able call the SDK directly with:
-        # `response = client.messages.create(...)` instead.
         try:
-            raw_response = client.beta.messages.with_raw_response.create(
-                max_tokens=max_tokens,
-                messages=messages,
-                model=model,
-                system=[system],
-                tools=tool_collection.to_params(),
-                betas=betas,
-                extra_body=extra_body,
-            )
+            full_response = None
+            response_params = []
+
+            # Use the AsyncAnthropic streaming API with async context manager
+            async with client.beta.messages.stream(**kwargs) as stream:
+                async for event in stream:
+                    # Handle simplified event types for thinking mode and text
+                    if event.type == "thinking":
+                        # Thinking content - send directly to output callback
+                        output_callback({"type": "thinking", "thinking": event.thinking})
+
+                    elif event.type == "text":
+                        # Text content - send directly to output callback
+                        output_callback({"type": "text", "text": event.text})
+
+                    elif event.type == "message_start":
+                        # Message has started
+                        full_response = event.message
+
+                    elif event.type == "content_block_start":
+                        # A content block has started
+                        if event.content_block.type == "tool_use":
+                            output_callback({"type": "tool_use", "input": event.content_block.input})
+
+                    elif event.type == "message_stop":
+                        # Message is complete
+                        if hasattr(event, "message"):
+                            full_response = event.message
+
         except (APIStatusError, APIResponseValidationError) as e:
             api_response_callback(e.request, e.response, e)
             return messages
         except APIError as e:
             api_response_callback(e.request, e.body, e)
             return messages
+        except Exception as e:
+            api_response_callback(None, None, e)
+            return messages
 
-        api_response_callback(
-            raw_response.http_response.request, raw_response.http_response, None
-        )
 
-        response = raw_response.parse()
-
-        response_params = _response_to_params(response)
-        messages.append(
-            {
-                "role": "assistant",
-                "content": response_params,
-            }
-        )
+        response_params = _response_to_params(full_response)
+        messages.append({
+            "role": "assistant",
+            "content": response_params,
+        })
 
         tool_result_content: list[BetaToolResultBlockParam] = []
         for content_block in response_params:
