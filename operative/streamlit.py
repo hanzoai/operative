@@ -136,15 +136,18 @@ def _reset_model_conf():
 
 
 async def main():
-    """Streamlit main loop."""
+    """Render loop for streamlit"""
     setup_state()
+
     st.markdown(STREAMLIT_STYLE, unsafe_allow_html=True)
+
     st.title("Hanzo Operative")
 
-    if not os.getenv("HIDE_WARNING", False):
+    if os.getenv("SHOW_WARNING", True):
         st.warning(WARNING_TEXT)
 
     with st.sidebar:
+
         def _reset_api_provider():
             if st.session_state.provider_radio != st.session_state.provider:
                 _reset_model()
@@ -218,6 +221,7 @@ async def main():
     chat_tab, http_logs_tab, streaming_tab = st.tabs(["Chat", "HTTP Logs", "Thinking Logs"])
 
     with chat_tab:
+        # render past chats
         for message in st.session_state.messages:
             if isinstance(message["content"], str):
                 _render_message(message["role"], message["content"])
@@ -228,6 +232,8 @@ async def main():
                     else:
                         _render_message(message["role"], cast(BetaContentBlockParam | ToolResult, block))
         new_message = st.chat_input("Type a message for Claude to control the computer...")
+
+        # render chat
         if new_message:
             st.session_state.messages.append({
                 "role": Sender.USER,
@@ -235,6 +241,7 @@ async def main():
             })
             _render_message(Sender.USER, new_message)
 
+    # render past http exchanges
     with http_logs_tab:
         for identity, (req, resp) in st.session_state.responses.items():
             _render_api_response(req, resp, identity, http_logs_tab)
@@ -250,7 +257,9 @@ async def main():
         last_msg = st.session_state.messages[-1]
     except IndexError:
         return
+
     if last_msg["role"] != Sender.USER:
+        # we don't have a user message to respond to, exit early
         return
 
     def bot_output_callback(block: BetaContentBlockParam):
@@ -352,6 +361,9 @@ def _api_response_callback(
     tab: DeltaGenerator,
     response_state: dict[str, tuple[httpx.Request, httpx.Response | object | None]],
 ):
+    """
+    Handle an API response by storing it to state and rendering it.
+    """
     resp_id = datetime.now().isoformat()
     response_state[resp_id] = (request, response)
     if error:
@@ -360,6 +372,7 @@ def _api_response_callback(
 
 
 def _tool_output_callback(tool_output: ToolResult, tool_id: str, tool_state: dict[str, ToolResult]):
+    """Handle a tool output by storing it to state and rendering it."""
     tool_state[tool_id] = tool_output
     _render_message(Sender.TOOL, tool_output)
 
@@ -370,6 +383,7 @@ def _render_api_response(
     resp_id: str,
     tab: DeltaGenerator,
 ):
+    """Render an API response to a streamlit tab"""
     with tab:
         with st.expander(f"Request/Response ({resp_id})"):
             newline = "\n\n"
