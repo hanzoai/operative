@@ -4,14 +4,12 @@ and its streaming response interface for beta computer use.
 """
 
 import platform
-import asyncio
 from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, cast
 
 import httpx
-from anthropic import APIError, APIResponseValidationError, APIStatusError
 from anthropic.types.beta import (
     BetaCacheControlEphemeralParam,
     BetaContentBlockParam,
@@ -128,41 +126,34 @@ async def sampling_loop(
             extra_body=extra_body,
             extra_headers=extra_headers,
         ) as stream:
-            assistant_blocks = []
-            final_text = ""
-            # Iterate over incremental text chunks.
-            async for text_chunk in stream.iter_text():
-                final_text += text_chunk
-                block: BetaContentBlockParam = {"type": "text", "text": text_chunk}
+            assistant_blocks, tool_use_blocks = [], []
+
+            async for block in stream.iter_blocks():
                 output_callback(block)
                 assistant_blocks.append(block)
-            # Manually construct a final BetaMessage using the accumulated text.
-            final_message = BetaMessage(
-                id="final",
-                type="message",
-                role="assistant",
-                model=model,
-                content=[BetaTextBlock(type="text", text=final_text)],
-                stop_reason="end_turn",
-                stop_sequence=None,
-                usage={"input_tokens": 0, "output_tokens": len(final_text.split())},  # approximate usage
-            )
+                if block.get("type") == "tool_use":
+                    tool_use_blocks.append(block)
+
+            if assistant_blocks:
+                messages.append({"role": "assistant", "content": assistant_blocks})
+
+            if tool_use_blocks:
+                tool_result_blocks = []
+                for block in tool_use_blocks:
+                    result = await tool_collection.run(
+                        name=block["name"],
+                        tool_input=cast(dict[str, Any], block["input"]),
+                    )
+                    tool_output_callback(result, block["id"])
+                    tool_result_blocks.append(_make_api_tool_result(result, block["id"]))
+
+                messages.append({"role": "tool", "content": tool_result_blocks})
+
     except Exception as e:
         api_response_callback(None, None, e)
         return messages
 
     api_response_callback(None, None, None)
-
-    final_blocks = _response_to_params(final_message)
-    for block in final_blocks:
-        if block.get("type") == "tool_use":
-            result = await tool_collection.run(
-                name=block["name"],
-                tool_input=cast(dict[str, Any], block["input"]),
-            )
-            tool_result = _make_api_tool_result(result, block["id"])
-            tool_output_callback(result, block["id"])
-    messages.append({"role": "assistant", "content": final_blocks})
     return messages
 
 
