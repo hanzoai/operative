@@ -6,7 +6,7 @@ COPY --chown=$USERNAME:$USERNAME operative/requirements.txt $HOME/operative/requ
 RUN python -m pip install -r "$HOME/operative/requirements.txt"
 
 # Copy desktop environment/app files
-COPY --chown=$USERNAME:$USERNAME image/ $HOME
+COPY --chown=$USERNAME:$USERNAME docker/image/ $HOME
 COPY --chown=$USERNAME:$USERNAME operative/ $HOME/operative/
 
 ARG DISPLAY_NUM=1

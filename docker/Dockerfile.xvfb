@@ -18,6 +18,7 @@ RUN apt-get update && \
     i3 picom arc-theme papirus-icon-theme gnome-themes-extra \
     # Python/pyenv reqs
     build-essential \
+    libglib2.0-bin \
     libssl-dev \
     zlib1g-dev \
     libbz2-dev \
@@ -81,7 +82,7 @@ ENV DISPLAY_NUM=1
 ENV HEIGHT=800
 ENV WIDTH=1280
 
-COPY --chown=$USERNAME:users image/start_all.sh $HOME/start_all.sh
+COPY --chown=$USERNAME:users docker/image/start_all.sh $HOME/start_all.sh
 RUN chmod +x $HOME/start_all.sh
 
 ENTRYPOINT ["./start_all.sh"]
