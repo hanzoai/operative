@@ -2,16 +2,18 @@
 
 set -e
 
-export DISPLAY=:${DISPLAY_NUM}
-export XDG_SESSION_TYPE=x11
-export XDG_SESSION_DESKTOP=budgie-desktop
-export XDG_CURRENT_DESKTOP=Budgie:GNOME
+export DISPLAY=:${DISPLAY_NUM:-1}
+export GEOMETRY="${WIDTH:-1280}x${HEIGHT:-800}x24"
 
-./xvfb_startup.sh
+# Start Xvfb
+Xvfb $DISPLAY -screen 0 $GEOMETRY &
+sleep 1
 
-# Start Budgie Desktop
-budgie-daemon &
-budgie-panel &
-budgie-wm &
+# Start VNC server
+x11vnc -display $DISPLAY -forever -shared &
 
-./x11vnc_startup.sh
+# Start noVNC
+/opt/noVNC/utils/novnc_proxy --vnc localhost:5900 --listen 6080 &
+
+# Keep container running
+tail -f /dev/null

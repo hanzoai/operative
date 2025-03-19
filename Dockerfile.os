@@ -3,19 +3,18 @@ FROM docker.io/ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBIAN_PRIORITY=high
 
-# Install base packages
+# Install desktop environment and required packages
 RUN apt-get update && \
     apt-get -y upgrade && \
     apt-get -y install \
-    # UI Requirements
-    xvfb \
+    xfce4 \
+    xfce4-terminal \
     xterm \
     xdotool \
     scrot \
     imagemagick \
     sudo \
     x11vnc \
-    ubuntu-budgie-desktop \
     # Python/pyenv reqs
     build-essential \
     libssl-dev \
@@ -34,16 +33,7 @@ RUN apt-get update && \
     liblzma-dev \
     # Network tools
     net-tools \
-    netcat \
-    # PPA req
-    software-properties-common && \
-    # Userland apps
-    sudo add-apt-repository ppa:mozillateam/ppa && \
-    sudo apt-get install -y --no-install-recommends \
-    libreoffice \
-    firefox-esr \
-    x11-apps \
-    unzip && \
+    netcat && \
     apt-get clean
 
 # Install noVNC
@@ -84,3 +74,5 @@ ENV PATH="$HOME/.pyenv/shims:$HOME/.pyenv/bin:$PATH"
 
 RUN python -m pip install --upgrade pip==23.1.2 setuptools==58.0.4 wheel==0.40.0 && \
     python -m pip config set global.disable-pip-version-check true
+
+ENTRYPOINT ["startxfce4"]

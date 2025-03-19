@@ -73,3 +73,13 @@ ENV PATH="$HOME/.pyenv/shims:$HOME/.pyenv/bin:$PATH"
 
 RUN python -m pip install --upgrade pip==23.1.2 setuptools==58.0.4 wheel==0.40.0 && \
     python -m pip config set global.disable-pip-version-check true
+
+# Add environment variables
+ENV DISPLAY_NUM=1
+ENV HEIGHT=800
+ENV WIDTH=1280
+
+COPY --chown=$USERNAME:users image/start_all.sh $HOME/start_all.sh
+RUN chmod +x $HOME/start_all.sh
+
+ENTRYPOINT ["./start_all.sh"]
