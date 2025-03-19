@@ -137,7 +137,7 @@ async def sampling_loop(
 
         # Configure thinking parameter
         if thinking_budget:
-            kwargs["thinking"] = {"type": "enabled", "budget": {"tokens": thinking_budget}}
+            kwargs["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}
 
         # Call the API
         try:
@@ -179,7 +179,6 @@ async def sampling_loop(
         except Exception as e:
             api_response_callback(None, None, e)
             return messages
-
 
         response_params = _response_to_params(full_response)
         messages.append({
