@@ -52,7 +52,7 @@ SONNET_3_5_NEW = ModelConfig(
 SONNET_3_7 = ModelConfig(
     tool_version="computer_use_20250124",
     max_output_tokens=128000,
-    default_output_tokens=16384,
+    default_output_tokens=64000,
     has_thinking=True,
 )
 MODEL_TO_MODEL_CONF: dict[str, ModelConfig] = {
