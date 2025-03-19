@@ -1,7 +1,7 @@
 .PHONY: build build-desktop build-xvfb push push-desktop push-xvfb run run-desktop run-xvfb all all-desktop all-xvfb
 
 # Build the Docker images
-build: build-xvfb
+build: push-xvfb
 	docker build -f docker/Dockerfile -t ghcr.io/hanzoai/operative:latest .
 
 build-desktop:
@@ -14,10 +14,10 @@ build-xvfb:
 push: push-xvfb
 	docker push ghcr.io/hanzoai/operative:latest
 
-push-desktop:
+push-desktop: build-desktop
 	docker push ghcr.io/hanzoai/desktop:latest
 
-push-xvfb:
+push-xvfb: build-xvfb
 	docker push ghcr.io/hanzoai/xvfb:latest
 
 # Run the Docker containers locally

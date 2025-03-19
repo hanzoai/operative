@@ -14,6 +14,8 @@ RUN apt-get update && \
     imagemagick \
     sudo \
     x11vnc \
+    # Theme
+    i3 picom arc-theme papirus-icon-theme gnome-themes-extra \
     # Python/pyenv reqs
     build-essential \
     libssl-dev \

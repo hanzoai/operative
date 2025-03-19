@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=hanzoai/xfvb:latest
+ARG BASE_IMAGE=ghcr.io/hanzoai/xvfb:latest
 FROM ${BASE_IMAGE}
 
 # Only reinstall if requirements.txt changes
