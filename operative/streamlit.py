@@ -218,10 +218,10 @@ async def main():
             return
         st.session_state.auth_validated = True
 
-    chat_tab, http_logs_tab, streaming_tab = st.tabs(["Chat", "HTTP Logs", "Thinking Logs"])
+    chat, http_logs, thinking_logs = st.tabs(["Chat", "HTTP Logs", "Thinking Logs"])
 
-    with chat_tab:
-        # render past chats
+    with chat:
+        # Render all past messages first
         for message in st.session_state.messages:
             if isinstance(message["content"], str):
                 _render_message(message["role"], message["content"])
@@ -231,22 +231,24 @@ async def main():
                         _render_message(Sender.TOOL, st.session_state.tools[block["tool_use_id"]])
                     else:
                         _render_message(message["role"], cast(BetaContentBlockParam | ToolResult, block))
-        new_message = st.chat_input("Type a message for Claude to control the computer...")
 
-        # render chat
-        if new_message:
+        user_input = st.chat_input("Type a message for Claude to control the computer...")
+
+        # If user typed something, handle it
+        if user_input:
+            # Possibly interrupt any ongoing sampling loop
             st.session_state.messages.append({
                 "role": Sender.USER,
-                "content": [*maybe_add_interruption_blocks(), BetaTextBlockParam(type="text", text=new_message)],
+                "content": [*maybe_add_interruption_blocks(), BetaTextBlockParam(type="text", text=user_input)],
             })
-            _render_message(Sender.USER, new_message)
+            _render_message(Sender.USER, user_input)
 
     # render past http exchanges
-    with http_logs_tab:
+    with http_logs:
         for identity, (req, resp) in st.session_state.responses.items():
-            _render_api_response(req, resp, identity, http_logs_tab)
+            _render_api_response(req, resp, identity, http_logs)
 
-    with streaming_tab:
+    with thinking_logs:
         streaming_placeholder = st.empty()
         if st.button("Clear Thinking Logs", key="clear_streaming"):
             st.session_state.streaming_thoughts = ""
@@ -259,9 +261,10 @@ async def main():
         return
 
     if last_msg["role"] != Sender.USER:
-        # we don't have a user message to respond to, exit early
+        # no user message to respond to
         return
 
+    # Callback to handle streaming events from the Anthropic API
     def bot_output_callback(block: BetaContentBlockParam):
         if block.get("type") == "thinking":
             current = st.session_state.streaming_thoughts
@@ -270,6 +273,7 @@ async def main():
         else:
             _render_message(Sender.BOT, block)
 
+    # Start the sampling loop
     with track_sampling_loop():
         st.session_state.messages = await sampling_loop(
             system_prompt_suffix=st.session_state.custom_system_prompt,
@@ -278,7 +282,7 @@ async def main():
             messages=st.session_state.messages,
             output_callback=bot_output_callback,
             tool_output_callback=partial(_tool_output_callback, tool_state=st.session_state.tools),
-            api_response_callback=partial(_api_response_callback, tab=http_logs_tab, response_state=st.session_state.responses),
+            api_response_callback=partial(_api_response_callback, tab=http_logs, response_state=st.session_state.responses),
             api_key=st.session_state.api_key,
             only_n_most_recent_images=st.session_state.only_n_most_recent_images,
             tool_version=st.session_state.tool_version,
@@ -419,13 +423,72 @@ def _render_error(error: Exception):
     st.error(f"**{error.__class__.__name__}**\n\n{body}")
 
 
+#def _render_message(sender: Sender, msg: str | BetaContentBlockParam | ToolResult):
+#    """
+#    Render a message in the Streamlit chat.
+#    """
+#    is_tool_result = not isinstance(msg, str | dict)
+#    if not msg or (is_tool_result and st.session_state.hide_images and not hasattr(msg, "error") and not hasattr(msg, "output")):
+#        return
+#    with st.chat_message(sender):
+#        if is_tool_result:
+#            msg = cast(ToolResult, msg)
+#            if msg.output:
+#                if msg.__class__.__name__ == "CLIResult":
+#                    st.code(msg.output)
+#                else:
+#                    st.markdown(msg.output)
+#            if msg.error:
+#                st.error(msg.error)
+#            if msg.base64_image and not st.session_state.hide_images:
+#                st.image(base64.b64decode(msg.base64_image))
+#        elif isinstance(msg, dict):
+#            if msg.get("type") == "text":
+#                text = msg.get("text", "")
+#                st.markdown(text)
+#            elif msg.get("type") == "thinking":
+#                st.markdown(f"**[Thinking]**\n\n{msg.get('thinking', '')}")
+#            elif msg.get("type") == "tool_use":
+#                st.code(f"Tool Use: {msg.get('name')}\nInput: {msg.get('input')}")
+#            else:
+#                st.json(msg)
+#        else:
+#            st.markdown(msg)
+
 def _render_message(sender: Sender, msg: str | BetaContentBlockParam | ToolResult):
     """
     Render a message in the Streamlit chat.
+    For the assistant, if the message is a text block, accumulate text into one bubble.
     """
-    is_tool_result = not isinstance(msg, str | dict)
+    # Determine if msg is a tool result (not str or dict)
+    is_tool_result = not isinstance(msg, (str, dict))
+
+    # If no message, or if it's a tool result that's hidden, return early.
     if not msg or (is_tool_result and st.session_state.hide_images and not hasattr(msg, "error") and not hasattr(msg, "output")):
         return
+
+    # For the assistant, accumulate text if it's a text message.
+    if sender == Sender.BOT and isinstance(msg, dict) and msg.get("type") == "text":
+        # Initialize accumulator and container if not present
+        if "current_assistant_text" not in st.session_state:
+            st.session_state.current_assistant_text = ""
+        if "assistant_container" not in st.session_state:
+            st.session_state.assistant_container = st.chat_message(sender)
+            st.session_state.assistant_placeholder = st.session_state.assistant_container.empty()
+        # Append new text to the accumulator
+        st.session_state.current_assistant_text += msg.get("text", "")
+        # Update the placeholder with the complete accumulated text
+        st.session_state.assistant_placeholder.markdown(st.session_state.current_assistant_text)
+        return  # We already updated the bubble, so exit early
+
+    # For non-streaming assistant messages or other senders, clear any previous accumulation.
+    if sender == Sender.BOT and "current_assistant_text" in st.session_state:
+        # Remove the current accumulation so that the next assistant response starts fresh.
+        st.session_state.pop("current_assistant_text")
+        st.session_state.pop("assistant_container", None)
+        st.session_state.pop("assistant_placeholder", None)
+
+    # For tool results, render accordingly.
     with st.chat_message(sender):
         if is_tool_result:
             msg = cast(ToolResult, msg)
@@ -440,8 +503,7 @@ def _render_message(sender: Sender, msg: str | BetaContentBlockParam | ToolResul
                 st.image(base64.b64decode(msg.base64_image))
         elif isinstance(msg, dict):
             if msg.get("type") == "text":
-                text = msg.get("text", "")
-                st.markdown(text)
+                st.markdown(msg.get("text", ""))
             elif msg.get("type") == "thinking":
                 st.markdown(f"**[Thinking]**\n\n{msg.get('thinking', '')}")
             elif msg.get("type") == "tool_use":
@@ -450,7 +512,6 @@ def _render_message(sender: Sender, msg: str | BetaContentBlockParam | ToolResul
                 st.json(msg)
         else:
             st.markdown(msg)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
