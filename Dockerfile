@@ -14,8 +14,8 @@ RUN apt-get update && \
     scrot \
     imagemagick \
     sudo \
-    mutter \
     x11vnc \
+    ubuntu-budgie-desktop \
     # Python/pyenv reqs
     build-essential \
     libssl-dev \
@@ -43,12 +43,6 @@ RUN apt-get update && \
     libreoffice \
     firefox-esr \
     x11-apps \
-    xpdf \
-    gedit \
-    xpaint \
-    tint2 \
-    galculator \
-    pcmanfm \
     unzip && \
     apt-get clean
 
