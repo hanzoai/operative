@@ -232,17 +232,6 @@ async def main():
                     else:
                         _render_message(message["role"], cast(BetaContentBlockParam | ToolResult, block))
 
-        user_input = st.chat_input("Type a message for Claude to control the computer...")
-
-        # If user typed something, handle it
-        if user_input:
-            # Possibly interrupt any ongoing sampling loop
-            st.session_state.messages.append({
-                "role": Sender.USER,
-                "content": [*maybe_add_interruption_blocks(), BetaTextBlockParam(type="text", text=user_input)],
-            })
-            _render_message(Sender.USER, user_input)
-
     # render past http exchanges
     with http_logs:
         for identity, (req, resp) in st.session_state.responses.items():
@@ -254,6 +243,17 @@ async def main():
             st.session_state.streaming_thoughts = ""
             streaming_placeholder.empty()
         streaming_placeholder.markdown(f"**[Thinking Logs]**\n{st.session_state.streaming_thoughts}")
+
+    user_input = st.chat_input("Type a message for Claude to control the computer...")
+
+    # If user typed something, handle it
+    if user_input:
+        # Possibly interrupt any ongoing sampling loop
+        st.session_state.messages.append({
+            "role": Sender.USER,
+            "content": [*maybe_add_interruption_blocks(), BetaTextBlockParam(type="text", text=user_input)],
+        })
+        _render_message(Sender.USER, user_input)
 
     try:
         last_msg = st.session_state.messages[-1]
