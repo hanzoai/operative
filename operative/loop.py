@@ -26,7 +26,6 @@ from anthropic.types.beta import (
 
 from .tools import TOOL_GROUPS_BY_VERSION, ToolCollection, ToolResult, ToolVersion
 
-# Used if prompt caching is enabled.
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
 
 
@@ -129,18 +128,29 @@ async def sampling_loop(
             extra_headers=extra_headers,
         ) as stream:
             assistant_blocks = []
+            final_text = ""
             # Use iter_text() to yield incremental text chunks.
             async for text in stream.iter_text():
+                final_text += text
                 block: BetaContentBlockParam = {"type": "text", "text": text}
                 output_callback(block)
                 assistant_blocks.append(block)
-            # Instead of get_final_message(), we call parse() to obtain the final message.
-            final_message: BetaMessage = await stream.parse()
+            # Manually construct a final message from the accumulated text.
+            final_message = BetaMessage(
+                id="final",
+                type="message",
+                role="assistant",
+                model=model,
+                content=[BetaTextBlock(type="text", text=final_text)],
+                stop_reason="end_turn",
+                stop_sequence=None,
+                usage={"input_tokens": 0, "output_tokens": len(final_text.split())},  # approximate usage
+            )
     except Exception as e:
         api_response_callback(None, None, e)
         return messages
 
-    # No raw HTTP request info available.
+    # No raw HTTP request info is available with the modern client.
     api_response_callback(None, None, None)
 
     final_blocks = _response_to_params(final_message)
