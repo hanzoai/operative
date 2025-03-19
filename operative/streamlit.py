@@ -52,7 +52,7 @@ SONNET_3_5_NEW = ModelConfig(
 SONNET_3_7 = ModelConfig(
     tool_version="computer_use_20250124",
     max_output_tokens=128000,
-    default_output_tokens=64000,
+    default_output_tokens=128000,
     has_thinking=True,
 )
 MODEL_TO_MODEL_CONF: dict[str, ModelConfig] = {
@@ -105,11 +105,11 @@ def setup_state():
     if "tools" not in st.session_state:
         st.session_state.tools = {}
     if "only_n_most_recent_images" not in st.session_state:
-        st.session_state.only_n_most_recent_images = 3
+        st.session_state.only_n_most_recent_images = 1
     if "custom_system_prompt" not in st.session_state:
         st.session_state.custom_system_prompt = load_from_storage("system_prompt") or ""
     if "hide_images" not in st.session_state:
-        st.session_state.hide_images = False
+        st.session_state.hide_images = True
     if "token_efficient_tools_beta" not in st.session_state:
         st.session_state.token_efficient_tools_beta = False
     if "in_sampling_loop" not in st.session_state:
@@ -195,7 +195,7 @@ async def main():
 
         st.number_input("Max Output Tokens", key="output_tokens", step=1)
 
-        st.checkbox("Thinking Enabled", key="thinking", value=False)
+        st.checkbox("Thinking Enabled", key="thinking", value=True)
         st.number_input(
             "Thinking Budget",
             key="thinking_budget",
