@@ -1,6 +1,14 @@
 #!/bin/bash
 set -e
 
+# Set default Git config if not already set via environment variables
+if [ -z "$(git config --global user.email)" ]; then
+    git config --global user.email "dev@hanzo.ai"
+fi
+if [ -z "$(git config --global user.name)" ]; then
+    git config --global user.name "Dev"
+fi
+
 ./start_all.sh
 ./novnc_startup.sh
 
