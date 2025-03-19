@@ -244,7 +244,7 @@ async def main():
             streaming_placeholder.empty()
         streaming_placeholder.markdown(f"**[Thinking Logs]**\n{st.session_state.streaming_thoughts}")
 
-    user_input = st.chat_input("Type a message for Operative to control the computer...")
+    user_input = st.chat_input("Message Operative your next instructions...")
 
     # If user typed something, handle it
     if user_input:
