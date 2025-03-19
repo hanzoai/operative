@@ -137,8 +137,8 @@ async def main():
     setup_state()
     st.markdown(STREAMLIT_STYLE, unsafe_allow_html=True)
     st.title("Hanzo Operative")
-    if os.getenv("SHOW_WARNING", True):
-        st.warning(WARNING_TEXT)
+    #if os.getenv("SHOW_WARNING", True):
+    #    st.warning(WARNING_TEXT)
 
     with st.sidebar:
         def _reset_api_provider():
@@ -199,7 +199,7 @@ async def main():
                         _render_message(Sender.TOOL, st.session_state.tools[block["tool_use_id"]])
                     else:
                         _render_message(message["role"], cast(BetaContentBlockParam | ToolResult, block))
-        new_message = st.chat_input("Type a message to send to Claude to control the computer...")
+        new_message = st.chat_input("Type a message to send to Operator to control the computer...")
         if new_message:
             st.session_state.messages.append({
                 "role": Sender.USER,
