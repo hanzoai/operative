@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-# Set Git config from environment variables or defaults
-git config --global user.email "${GIT_USER_EMAIL:-dev@hanzo.ai}"
-git config --global user.name "${GIT_USER_NAME:-Dev}"
+# Ensure Git config is set for operative user
+sudo -u operative git config --global user.email "${GIT_USER_EMAIL:-dev@hanzo.ai}"
+sudo -u operative git config --global user.name "${GIT_USER_NAME:-Dev}"
 
 ./start_all.sh
 ./novnc_startup.sh
