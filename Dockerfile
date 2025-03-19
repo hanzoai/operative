@@ -1,4 +1,5 @@
-FROM hanzoai/os:latest
+ARG BASE_IMAGE=hanzoai/desktop:latest
+FROM ${BASE_IMAGE}
 
 # Only reinstall if requirements.txt changes
 COPY --chown=$USERNAME:$USERNAME operative/requirements.txt $HOME/operative/requirements.txt
