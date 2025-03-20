@@ -4,10 +4,17 @@ FROM ${BASE_IMAGE}
 # Setup user
 ENV USERNAME=operative
 ENV HOME=/home/$USERNAME
-RUN useradd -m -s /bin/bash -d "$HOME" "$USERNAME"
-RUN chown -R ${USERNAME}:${USERNAME} ${HOME}
-RUN echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-USER operative
+
+# Create user only if it doesn't exist
+RUN id -u ${USERNAME} 2>/dev/null || useradd -m -s /bin/bash -d "$HOME" "$USERNAME"
+
+# Ensure home directory exists with proper permissions
+RUN mkdir -p $HOME && chown -R $(id -u ${USERNAME}):$(id -g ${USERNAME}) $HOME
+
+# Set sudo permissions if needed
+RUN grep -q "${USERNAME}.*ALL=(ALL)" /etc/sudoers || echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+USER ${USERNAME}
 WORKDIR $HOME
 
 # Install Python 3.12 using uv
