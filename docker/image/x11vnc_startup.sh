@@ -2,6 +2,7 @@
 echo "starting vnc"
 
 (x11vnc -display $DISPLAY \
+    -ncache 10 \
     -forever \
     -shared \
     -wait 50 \

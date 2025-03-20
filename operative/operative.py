@@ -1,11 +1,11 @@
 """
-Entrypoint for Streamlit using the modern AsyncAnthropic client and a UI for controlling thinking.
+Entrypoint for Operative using the modern AsyncAnthropic client and a UI for controlling thinking.
 """
-
 import asyncio
 import base64
 import os
 import subprocess
+import sys
 import traceback
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -24,6 +24,10 @@ from anthropic.types.beta import (
     BetaToolResultBlockParam,
 )
 from streamlit.delta_generator import DeltaGenerator
+
+# Ensure we have the operative package on our PYTHONPATH
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, parent_dir)
 
 from operative.loop import APIProvider, sampling_loop
 from operative.tools import ToolResult, ToolVersion
@@ -201,7 +205,7 @@ async def main():
             key="thinking_budget",
             max_value=st.session_state.max_output_tokens,
             step=1,
-            disabled=not st.session_state.thinking,
+            disabled=not st.session_state.thinking_budget,
         )
 
         if st.button("Reset", type="primary"):

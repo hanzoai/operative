@@ -9,7 +9,7 @@ from operative.streamlit import Sender
 
 @pytest.fixture
 def streamlit_app():
-    return AppTest.from_file("operative/streamlit.py")
+    return AppTest.from_file("operative/operative.py")
 
 
 def test_streamlit(streamlit_app: AppTest):

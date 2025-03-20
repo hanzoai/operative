@@ -1,3 +1,7 @@
+[project]
+name = "operative"
+version = "0.1.0"
+
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
@@ -6,3 +10,4 @@ useLibraryCodeForTypes = false
 [tool.pytest.ini_options]
 pythonpath = "."
 asyncio_mode = "auto"
+

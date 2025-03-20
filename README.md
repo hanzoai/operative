@@ -134,7 +134,7 @@ The container stores settings like the API key and custom system prompt in `~/.a
 
 Alternative access points:
 
-- Streamlit interface only: [http://localhost:8501](http://localhost:8501)
+- Operative interface only: [http://localhost:8501](http://localhost:8501)
 - Desktop view only: [http://localhost:6080/vnc.html](http://localhost:6080/vnc.html)
 - Direct VNC connection: `vnc://localhost:5900` (for VNC clients)
 
@@ -180,4 +180,5 @@ docker run \
     -it operative:local # can also use ghcr.io/hanzoai/operative:latest
 ```
 
-The docker run command above mounts the repo inside the docker image, such that you can edit files from the host. Streamlit is already configured with auto reloading.
+The docker run command above mounts the repo inside the docker image, such that
+you can edit files from the host, the app is configured with auto reloading.
