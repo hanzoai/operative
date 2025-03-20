@@ -7,40 +7,41 @@ ENV HOME=/home/$USERNAME
 RUN useradd -m -s /bin/bash -d "$HOME" "$USERNAME"
 RUN chown -R ${USERNAME}:${USERNAME} ${HOME}
 RUN echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-
 USER operative
 WORKDIR $HOME
 
-# Setup pyenv
-RUN git clone https://github.com/pyenv/pyenv.git ~/.pyenv && \
-    cd ~/.pyenv && src/configure && make -C src && cd .. && \
-    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc && \
-    echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc && \
-    echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+# Install Python 3.12 using uv
+ENV UV_PYTHON_VERSION_MAJOR=3
+ENV UV_PYTHON_VERSION_MINOR=12
+ENV UV_PYTHON_VERSION_PATCH=7
+ENV UV_PYTHON_VERSION=$UV_PYTHON_VERSION_MAJOR.$UV_PYTHON_VERSION_MINOR.$UV_PYTHON_VERSION_PATCH
 
-ENV PYENV_ROOT="$HOME/.pyenv"
-ENV PATH="$PYENV_ROOT/bin:$PATH"
-ENV PYENV_VERSION_MAJOR=3
-ENV PYENV_VERSION_MINOR=12
-ENV PYENV_VERSION_PATCH=7
-ENV PYENV_VERSION=$PYENV_VERSION_MAJOR.$PYENV_VERSION_MINOR.$PYENV_VERSION_PATCH
+# Install uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 
-RUN eval "$(pyenv init -)" && \
-    pyenv install "$PYENV_VERSION" && \
-    pyenv global "$PYENV_VERSION" && \
-    pyenv rehash
+ENV PATH="$HOME/.local/bin:$PATH"
 
-ENV PATH="$HOME/.pyenv/shims:$HOME/.pyenv/bin:$PATH"
-
-# Only reinstall if requirements.txt changes
-COPY --chown=$USERNAME:$USERNAME operative/requirements.txt $HOME/operative/requirements.txt
-
-RUN python -m pip install --upgrade pip==23.1.2 setuptools==68.0.0 wheel==0.40.0 && \
-    python -m pip config set global.disable-pip-version-check true && \
-    python -m pip install -r "$HOME/operative/requirements.txt"
+# Configure uv
+RUN mkdir -p ~/.config/uv && \
+    echo '[global]' > ~/.config/uv/config.toml && \
+    echo 'disable-pip-version-check = true' >> ~/.config/uv/config.toml
 
 # Copy desktop environment/app files
 COPY --chown=$USERNAME:$USERNAME docker/image $HOME/.operative/
+COPY --chown=$USERNAME:$USERNAME requirements.txt $HOME/.operative/requirements.txt
+COPY --chown=$USERNAME:$USERNAME operative/requirements.txt $HOME/.operative/operative/requirements.txt
+
+# Create virtual environment in project directory
+RUN ~/.local/bin/uv venv ~/.operative/.venv && \
+    echo 'source ~/.operative/.venv/bin/activate' >> ~/.bashrc
+
+# Install dependencies - use bash explicitly to enable source
+RUN /bin/bash -c '. ~/.operative/.venv/bin/activate && \
+    ~/.local/bin/uv pip install setuptools==68.0.0 wheel==0.40.0 && \
+    ~/.local/bin/uv pip install -r ~/.operative/requirements.txt'
+
+# Copy remaining operative files
 COPY --chown=$USERNAME:$USERNAME operative/ $HOME/.operative/operative
 
 ARG DISPLAY_NUM=1
@@ -57,5 +58,4 @@ ENV VNC_ENDPOINT=operative-vnc.hanzo.ai
 ENV API_ENDPOINT=api.hanzo.ai
 
 RUN chmod +x $HOME/.operative/start_all.sh
-
 ENTRYPOINT [".operative/entrypoint.sh"]

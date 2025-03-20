@@ -1,6 +1,37 @@
-[server]
-fileWatcherType = "auto"
-runOnSave = true
-
 [browser]
 gatherUsageStats = false
+serverAddress = "localhost"
+serverPort = 8501
+
+[runner]
+magicEnabled = true
+fastReruns = true
+postScriptGC = true
+
+[server]
+headless = true
+enableCORS = true
+enableXsrfProtection = true
+cookieSecret = "not-a-safe-secret"
+allowRunOnSave = false
+fileWatcherType = "auto"
+maxUploadSize = 200
+maxMessageSize = 200
+enableWebsocketCompression = true
+enableStaticServing = false
+baseUrlPath = ""
+
+[theme]
+base = "dark"
+primaryColor = "#ffffff"
+backgroundColor = "#000000"
+secondaryBackgroundColor = "#222222"
+textColor = "#efefef"
+font = "Inter"
+
+[mapbox]
+token = ""
+
+[logger]
+level = "error"
+messageFormat = "%(asctime)s %(message)s"

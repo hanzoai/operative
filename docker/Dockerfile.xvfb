@@ -2,27 +2,40 @@ FROM docker.io/ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DEBIAN_PRIORITY=high
+ENV TZ=UTC
+
+# Install timezone data first
+RUN apt-get update && \
+    apt-get install -y tzdata && \
+    ln -fs /usr/share/zoneinfo/UTC /etc/localtime && \
+    dpkg-reconfigure --frontend noninteractive tzdata
 
 RUN apt-get update && \
-    apt-get -y upgrade && \
-    apt-get -y install \
-    # UI Requirements
+    apt-get install -y sudo software-properties-common && \
+    sudo add-apt-repository ppa:deadsnakes/ppa && \
+    sudo add-apt-repository ppa:mozillateam/ppa && \
+    sudo apt-get update && \
+    sudo apt-get -y upgrade && \
+    sudo apt-get -y install \
     xvfb \
     xterm \
     xdotool \
     scrot \
     imagemagick \
-    sudo \
     mutter \
     x11vnc \
-    # Python/pyenv reqs
     build-essential \
-    libssl-dev  \
+    python3.12 \
+    python3.12-dev \
+    python3.12-venv \
+    python3-pip \
+    libssl-dev \
     zlib1g-dev \
     libbz2-dev \
     libreadline-dev \
     libsqlite3-dev \
     curl \
+    wget \
     git \
     libncursesw5-dev \
     xz-utils \
@@ -31,16 +44,12 @@ RUN apt-get update && \
     libxmlsec1-dev \
     libffi-dev \
     liblzma-dev \
-    # Network tools
     net-tools \
-    netcat \
-    # PPA req
-    software-properties-common && \
-    # Userland apps
-    sudo add-apt-repository ppa:mozillateam/ppa && \
+    netcat && \
     sudo apt-get install -y --no-install-recommends \
     libreoffice \
     firefox-esr \
+    chromium-browser \
     x11-apps \
     xpdf \
     gedit \
@@ -49,7 +58,11 @@ RUN apt-get update && \
     galculator \
     pcmanfm \
     unzip && \
-    apt-get clean
+    sudo apt-get clean
+
+# Create symlinks for python/python3
+RUN sudo ln -sf /usr/bin/python3.12 /usr/local/bin/python && \
+    sudo ln -sf /usr/bin/python3.12 /usr/local/bin/python3
 
 # Install noVNC
 RUN git clone --branch v1.6.0 https://github.com/novnc/noVNC.git /opt/noVNC && \
