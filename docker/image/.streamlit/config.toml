@@ -23,9 +23,9 @@ baseUrlPath = ""
 
 [theme]
 base = "dark"
-primaryColor = "#333"
-backgroundColor = "#000"
-secondaryBackgroundColor = "#222"
+primaryColor = "#686868"
+backgroundColor = "#222"
+secondaryBackgroundColor = "#333"
 textColor = "#eeeeee"
 font = "Inter"
 

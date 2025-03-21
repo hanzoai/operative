@@ -46,10 +46,9 @@ OUTPUT_128K_BETA_FLAG = "output-128k-2025-02-19"
 # environment it is running in, and to provide any additional information that may be
 # helpful for the task at hand.
 SYSTEM_PROMPT = f"""<SYSTEM_CAPABILITY>
-* You are utilising an Ubuntu virtual machine using {platform.machine()} architecture with internet access.
-* You can feel free to install Ubuntu applications with your bash tool, make sure to use scripting friendly commands like apt-get and apt-cache.
+* You are named "Operative", an autonomous and continually operating agent utilising an Ubuntu virtual machine using {platform.machine()} architecture with internet access.
+* You can feel free to install Ubuntu applications with your bash tool, but make sure to use scripting friendly commands like apt-get and apt-cache.
 * Use curl instead of wget.
-* Replace google.com link with relevant link if user requests different.
 * Using bash tool you can start GUI applications, but you need to set export DISPLAY=:1 and use a subshell. For example "(DISPLAY=:1 xterm &)". GUI apps run with bash tool will appear within your desktop environment, but they may take some time to appear. Take a screenshot to confirm it did.
 * To open firefox, use bash tool and run `DISPLAY=:1 firefox-esr https://google.com & disown`.
 * When using your bash tool with commands that are expected to output very large quantities of text, redirect into a tmp file and use str_replace_editor or `grep -n -B <lines before> -A <lines after> <query> <filename>` to confirm output.
@@ -87,6 +86,7 @@ class APIProvider(StrEnum):
     BEDROCK = "bedrock"
     VERTEX = "vertex"
 
+
 async def sampling_loop(
     *,
     model: str,
@@ -95,9 +95,7 @@ async def sampling_loop(
     messages: list[dict],
     output_callback: Callable[[BetaContentBlockParam], None],
     tool_output_callback: Callable[[ToolResult, str], None],
-    api_response_callback: Callable[
-        [httpx.Request | None, httpx.Response | object | None, Exception | None], None
-    ],
+    api_response_callback: Callable[[httpx.Request | None, httpx.Response | object | None, Exception | None], None],
     api_key: str,
     only_n_most_recent_images: int | None = None,
     max_tokens: int = 4096,
@@ -105,126 +103,184 @@ async def sampling_loop(
     thinking_budget: int | None = None,
     token_efficient_tools_beta: bool = False,
 ) -> list[dict]:
-    """
-    Agentic sampling loop for the assistant/tool interaction of computer use.
-    """
-    # Prepare tool collection.
-    tool_group = TOOL_GROUPS_BY_VERSION[tool_version]
-    tool_collection = ToolCollection(*(cls() for cls in tool_group.tools))
-    system = BetaTextBlockParam(
-        type="text",
-        text=f"{SYSTEM_PROMPT}{' ' + system_prompt_suffix if system_prompt_suffix else ''}",
-    )
+    """Agentic sampling loop for assistant/tool interaction of computer use."""
 
-    while True:
-        enable_prompt_caching = False
-        betas = [tool_group.beta_flag] if tool_group.beta_flag else []
+    def setup_tool_collection():
+        """Create and return tool collection for specified version."""
+        tool_group = TOOL_GROUPS_BY_VERSION[tool_version]
+        return ToolCollection(*(cls() for cls in tool_group.tools))
+
+    def create_system_prompt():
+        """Create the system prompt with optional suffix."""
+        return BetaTextBlockParam(
+            type="text",
+            text=f"{SYSTEM_PROMPT}{' ' + system_prompt_suffix if system_prompt_suffix else ''}"
+        )
+
+    def get_api_client():
+        """Get API client based on provider."""
+        if provider == APIProvider.ANTHROPIC:
+            return AsyncAnthropic(api_key=api_key, max_retries=4)
+        elif provider == APIProvider.VERTEX:
+            return AsyncAnthropicVertex()
+        else:  # BEDROCK
+            return AsyncAnthropicBedrock()
+
+    def get_beta_flags():
+        """Determine which beta flags to enable."""
+        tool_group = TOOL_GROUPS_BY_VERSION[tool_version]
+        betas = []
+
+        # Add tool-specific beta flag if present
+        if tool_group.beta_flag:
+            betas.append(tool_group.beta_flag)
+
+        # Add token efficient tools beta if requested
         if token_efficient_tools_beta:
             betas.append("token-efficient-tools-2025-02-19")
-        # Add the 128K output tokens beta flag
-        betas.append(OUTPUT_128K_BETA_FLAG)
-        image_truncation_threshold = only_n_most_recent_images or 0
-        if provider == APIProvider.ANTHROPIC:
-            client = AsyncAnthropic(api_key=api_key, max_retries=4)
-            enable_prompt_caching = True
-        elif provider == APIProvider.VERTEX:
-            client = AsyncAnthropicVertex()
-        elif provider == APIProvider.BEDROCK:
-            client = AsyncAnthropicBedrock()
 
-        if enable_prompt_caching:
+        # Always add 128K output tokens beta
+        betas.append(OUTPUT_128K_BETA_FLAG)
+
+        return betas
+
+    def configure_prompt_caching(system, betas):
+        """Configure prompt caching if using Anthropic API."""
+        if provider == APIProvider.ANTHROPIC:
             betas.append(PROMPT_CACHING_BETA_FLAG)
             _inject_prompt_caching(messages)
-            # Because cached reads are 10% of the price, we don't think it's
-            # ever sensible to break the cache by truncating images
-            only_n_most_recent_images = 0
-            # Use type ignore to bypass TypedDict check until SDK types are updated
             system["cache_control"] = {"type": "ephemeral"}  # type: ignore
 
-        if only_n_most_recent_images:
-            _maybe_filter_to_n_most_recent_images(
-                messages,
-                only_n_most_recent_images,
-                min_removal_threshold=image_truncation_threshold,
-            )
+        return system
 
-        kwargs = {
+    def prepare_api_parameters(system, tool_collection, betas):
+        """Prepare API call parameters."""
+        params = {
             "max_tokens": max_tokens,
-            "messages":   messages,
-            "model":      model,
-            "system":     [system],
-            "tools":      tool_collection.to_params(),
-            "betas":      betas,
+            "messages": messages,
+            "model": model,
+            "system": [system],
+            "tools": tool_collection.to_params(),
+            "betas": betas,
         }
 
-        # Configure thinking parameter
         if thinking_budget:
-            kwargs["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}
+            params["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}
 
-        # Call the API
+        return params
+
+    def handle_stream_event(event):
+        """Process streaming events and call the appropriate callback."""
+        event_handlers = {
+            "thinking": lambda: output_callback({"type": "thinking", "thinking": event.thinking}),
+            "text": lambda: output_callback({"type": "text", "text": event.text}),
+            "content_block_start": lambda: process_content_block_start(event),
+        }
+
+        handler = event_handlers.get(event.type)
+        if handler:
+            handler()
+
+    def process_content_block_start(event):
+        """Process content block start events."""
+        if (event.content_block.type == "tool_use" and
+                hasattr(event.content_block, "input") and
+                event.content_block.input):  # Check that input exists and is not empty
+            output_callback({
+                "type": "tool_use",
+                "name": event.content_block.name,  # Include tool name
+                "input": event.content_block.input
+            })
+
+    async def stream_response(client, params):
+        """Stream the response and track the full message."""
+        full_response = None
+
+        async with client.beta.messages.stream(**params) as stream:
+            async for event in stream:
+                handle_stream_event(event)
+
+                # Track message state
+                if event.type == "message_start":
+                    full_response = event.message
+                elif event.type == "message_stop" and hasattr(event, "message"):
+                    full_response = event.message
+
+        return full_response
+
+    async def execute_tool(content_block):
+        """Execute a tool and process its result."""
+        if content_block["type"] != "tool_use":
+            return None
+
+        result = await tool_collection.run(
+            name=content_block["name"],
+            tool_input=cast(dict[str, Any], content_block["input"]),
+        )
+
+        tool_output_callback(result, content_block["id"])
+        return _make_api_tool_result(result, content_block["id"])
+
+    async def process_tools(response_params):
+        """Process all tool calls in the response."""
+        tool_results = []
+
+        for block in response_params:
+            tool_result = await execute_tool(block)
+            if tool_result:
+                tool_results.append(tool_result)
+
+        return tool_results
+
+    def handle_error(error):
+        """Handle API errors with appropriate callback."""
+        if isinstance(error, (APIStatusError, APIResponseValidationError)):
+            api_response_callback(error.request, error.response, error)
+        elif isinstance(error, APIError):
+            api_response_callback(error.request, error.body, error)
+        else:
+            api_response_callback(None, None, error)
+
+    # Main loop
+    while True:
+        tool_collection = setup_tool_collection()
+        system = create_system_prompt()
+        client = get_api_client()
+
+        # Configure API call
+        betas = get_beta_flags()
+        system = configure_prompt_caching(system, betas)
+
+        # Handle image filtering if needed
+        image_limit = 0 if provider == APIProvider.ANTHROPIC else only_n_most_recent_images
+        if image_limit:
+            _maybe_filter_to_n_most_recent_images(
+                messages, image_limit, min_removal_threshold=image_limit
+            )
+
+        # Prepare API parameters and execute
+        api_params = prepare_api_parameters(system, tool_collection, betas)
+
         try:
-            full_response = None
-            response_params = []
+            # Process streaming response
+            full_response = await stream_response(client, api_params)
 
-            # Use the AsyncAnthropic streaming API with async context manager
-            async with client.beta.messages.stream(**kwargs) as stream:
-                async for event in stream:
-                    # Handle simplified event types for thinking mode and text
-                    if event.type == "thinking":
-                        # Thinking content - send directly to output callback
-                        output_callback({"type": "thinking", "thinking": event.thinking})
+            # Add assistant response to messages
+            response_params = _response_to_params(full_response)
+            messages.append({"role": "assistant", "content": response_params})
 
-                    elif event.type == "text":
-                        # Text content - send directly to output callback
-                        output_callback({"type": "text", "text": event.text})
+            # Process tool calls
+            tool_results = await process_tools(response_params)
 
-                    elif event.type == "message_start":
-                        # Message has started
-                        full_response = event.message
+            if not tool_results:
+                return messages
 
-                    elif event.type == "content_block_start":
-                        # A content block has started
-                        if event.content_block.type == "tool_use":
-                            output_callback({"type": "tool_use", "input": event.content_block.input})
+            # Add tool results to messages
+            messages.append({"content": tool_results, "role": "user"})
 
-                    elif event.type == "message_stop":
-                        # Message is complete
-                        if hasattr(event, "message"):
-                            full_response = event.message
-
-        except (APIStatusError, APIResponseValidationError) as e:
-            api_response_callback(e.request, e.response, e)
-            return messages
-        except APIError as e:
-            api_response_callback(e.request, e.body, e)
-            return messages
         except Exception as e:
-            api_response_callback(None, None, e)
+            handle_error(e)
             return messages
-
-        response_params = _response_to_params(full_response)
-        messages.append({
-            "role": "assistant",
-            "content": response_params,
-        })
-
-        tool_result_content: list[BetaToolResultBlockParam] = []
-        for content_block in response_params:
-            output_callback(content_block)
-            if content_block["type"] == "tool_use":
-                result = await tool_collection.run(
-                    name=content_block["name"],
-                    tool_input=cast(dict[str, Any], content_block["input"]),
-                )
-                tool_result_content.append(
-                    _make_api_tool_result(result, content_block["id"])
-                )
-                tool_output_callback(result, content_block["id"])
-
-        if not tool_result_content:
-            return messages
-
-        messages.append({"content": tool_result_content, "role": "user"})
 
 
 def _maybe_filter_to_n_most_recent_images(
