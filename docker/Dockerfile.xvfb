@@ -14,6 +14,7 @@ RUN apt-get update && \
     apt-get install -y sudo software-properties-common && \
     sudo add-apt-repository ppa:deadsnakes/ppa && \
     sudo add-apt-repository ppa:mozillateam/ppa && \
+    sudo add-apt-repository ppa:saiarcot895/chromium-dev && \
     sudo apt-get update && \
     sudo apt-get -y upgrade && \
     sudo apt-get -y install \
@@ -48,8 +49,8 @@ RUN apt-get update && \
     netcat && \
     sudo apt-get install -y --no-install-recommends \
     libreoffice \
-    firefox-esr \
     chromium-browser \
+    firefox-esr \
     x11-apps \
     xpdf \
     gedit \
