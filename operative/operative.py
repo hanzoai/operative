@@ -145,10 +145,10 @@ async def main():
 
     st.markdown(STREAMLIT_STYLE, unsafe_allow_html=True)
 
-    st.title("Hanzo Operative")
+    st.title("Operative")
 
-    #if os.getenv("SHOW_WARNING", True):
-    #    st.warning(WARNING_TEXT)
+    if os.getenv("SHOW_WARNING", True):
+        st.warning(WARNING_TEXT)
 
     with st.sidebar:
 
