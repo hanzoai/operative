@@ -11,6 +11,16 @@ setup:
 	. .venv/bin/activate && uv pip install pre-commit watchdog
 	. .venv/bin/activate && pre-commit install
 
+dev:
+	docker run -e ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
+		-v $(pwd)/operative:/home/operative/.operative/operative \
+		-v $(HOME)/.anthropic:/home/operative/.anthropic \
+		-p 5900:5900 \
+		-p 8501:8501 \
+		-p 6080:6080 \
+		-p 8080:8080 \
+		-it ghcr.io/hanzoai/operative:latest
+
 ghcr-login:
 	echo $$GITHUB_PAT | docker login ghcr.io -u $$GITHUB_USERNAME --password-stdin
 
