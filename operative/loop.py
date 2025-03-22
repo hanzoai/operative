@@ -169,28 +169,40 @@ async def sampling_loop(
 
         return params
 
-    def handle_stream_event(event):
-        """Process streaming events and call the appropriate callback."""
-        event_handlers = {
-            "thinking": lambda: output_callback({"type": "thinking", "thinking": event.thinking}),
-            "text": lambda: output_callback({"type": "text", "text": event.text}),
-            "content_block_start": lambda: process_content_block_start(event),
-        }
+def handle_stream_event(event):
+    """Process streaming events and call the appropriate callback."""
+    event_types = {
+        "thinking": lambda: output_callback({"type": "thinking", "thinking": event.thinking}),
+        "thinking_delta": lambda: output_callback({"type": "thinking_delta", "thinking_delta": event.thinking_delta}),
+        "text": lambda: output_callback({"type": "text", "text": event.text}),
+        "content_block_start": lambda: process_content_block_start(event),
+        "content_block_delta": lambda: process_content_block_delta(event),
+        "tool_use_progress": lambda: process_tool_progress(event),
+    }
 
-        handler = event_handlers.get(event.type)
-        if handler:
-            handler()
+    handler = event_types.get(event.type)
+    if handler:
+        handler()
 
     def process_content_block_start(event):
         """Process content block start events."""
         if (event.content_block.type == "tool_use" and
-                hasattr(event.content_block, "input") and
-                event.content_block.input):  # Check that input exists and is not empty
+                hasattr(event.content_block, "input")):
             output_callback({
                 "type": "tool_use",
-                "name": event.content_block.name,  # Include tool name
-                "input": event.content_block.input
+                "name": getattr(event.content_block, "name", "Unknown Tool"),
+                "input": event.content_block.input or {}
             })
+
+    def process_content_block_delta(event):
+        """Process content block delta events."""
+        if hasattr(event, "delta") and event.delta:
+            output_callback({"type": "delta", "delta": event.delta})
+
+    def process_tool_progress(event):
+        """Process tool progress events."""
+        if hasattr(event, "progress"):
+            output_callback({"type": "progress", "progress": event.progress})
 
     async def stream_response(client, params):
         """Stream the response and track the full message."""
@@ -213,13 +225,24 @@ async def sampling_loop(
         if content_block["type"] != "tool_use":
             return None
 
-        result = await tool_collection.run(
-            name=content_block["name"],
-            tool_input=cast(dict[str, Any], content_block["input"]),
-        )
+        try:
+            result = await tool_collection.run(
+                name=content_block["name"],
+                tool_input=cast(dict[str, Any], content_block["input"]),
+            )
 
-        tool_output_callback(result, content_block["id"])
-        return _make_api_tool_result(result, content_block["id"])
+            tool_output_callback(result, content_block["id"])
+            return _make_api_tool_result(result, content_block["id"])
+        except Exception as e:
+            # Handle tool execution errors
+            error_result = ToolResult(
+                error=f"Tool execution error: {str(e)}",
+                output=None,
+                base64_image=None,
+                system="Error occurred during tool execution"
+            )
+            tool_output_callback(error_result, content_block["id"])
+            return _make_api_tool_result(error_result, content_block["id"])
 
     async def process_tools(response_params):
         """Process all tool calls in the response."""
