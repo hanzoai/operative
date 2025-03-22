@@ -23,10 +23,10 @@ baseUrlPath = ""
 
 [theme]
 base = "dark"
-primaryColor = "#686868"
-backgroundColor = "#222"
-secondaryBackgroundColor = "#333"
-textColor = "#eeeeee"
+primaryColor="#222222"
+backgroundColor="#000000"
+secondaryBackgroundColor="#111111"
+textColor="#FAFAFA"
 font = "Inter"
 
 [mapbox]
