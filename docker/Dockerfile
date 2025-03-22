@@ -12,7 +12,7 @@ RUN id -u ${USERNAME} 2>/dev/null || useradd -m -s /bin/bash -d "$HOME" "$USERNA
 RUN mkdir -p $HOME && chown -R $(id -u ${USERNAME}):$(id -g ${USERNAME}) $HOME
 
 # Set sudo permissions
-RUN sudo bash -c 'grep -q "${USERNAME}.*ALL=(ALL)" /etc/sudoers || echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers'
+RUN sudo bash -c 'echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers'
 
 USER ${USERNAME}
 WORKDIR $HOME
