@@ -11,6 +11,9 @@ setup:
 	. .venv/bin/activate && uv pip install pre-commit watchdog
 	. .venv/bin/activate && pre-commit install
 
+ghcr-login:
+	echo $$GITHUB_PAT | docker login ghcr.io -u $$GITHUB_USERNAME --password-stdin
+
 # Run locally using uv
 run:
 	uv run -- python3 -m streamlit run operative/operative.py
