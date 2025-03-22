@@ -130,18 +130,11 @@ async def sampling_loop(
         """Determine which beta flags to enable."""
         tool_group = TOOL_GROUPS_BY_VERSION[tool_version]
         betas = []
-
-        # Add tool-specific beta flag if present
         if tool_group.beta_flag:
             betas.append(tool_group.beta_flag)
-
-        # Add token efficient tools beta if requested
         if token_efficient_tools_beta:
             betas.append("token-efficient-tools-2025-02-19")
-
-        # Always add 128K output tokens beta
         betas.append(OUTPUT_128K_BETA_FLAG)
-
         return betas
 
     def configure_prompt_caching(system, betas):
@@ -150,7 +143,6 @@ async def sampling_loop(
             betas.append(PROMPT_CACHING_BETA_FLAG)
             _inject_prompt_caching(messages)
             system["cache_control"] = {"type": "ephemeral"}  # type: ignore
-
         return system
 
     def prepare_api_parameters(system, tool_collection, betas):
@@ -163,31 +155,13 @@ async def sampling_loop(
             "tools": tool_collection.to_params(),
             "betas": betas,
         }
-
         if thinking_budget:
             params["thinking"] = {"type": "enabled", "budget_tokens": thinking_budget}
-
         return params
-
-def handle_stream_event(event):
-    """Process streaming events and call the appropriate callback."""
-    event_types = {
-        "thinking": lambda: output_callback({"type": "thinking", "thinking": event.thinking}),
-        "thinking_delta": lambda: output_callback({"type": "thinking_delta", "thinking_delta": event.thinking_delta}),
-        "text": lambda: output_callback({"type": "text", "text": event.text}),
-        "content_block_start": lambda: process_content_block_start(event),
-        "content_block_delta": lambda: process_content_block_delta(event),
-        "tool_use_progress": lambda: process_tool_progress(event),
-    }
-
-    handler = event_types.get(event.type)
-    if handler:
-        handler()
 
     def process_content_block_start(event):
         """Process content block start events."""
-        if (event.content_block.type == "tool_use" and
-                hasattr(event.content_block, "input")):
+        if (hasattr(event, "content_block") and event.content_block.type == "tool_use" and hasattr(event.content_block, "input")):
             output_callback({
                 "type": "tool_use",
                 "name": getattr(event.content_block, "name", "Unknown Tool"),
@@ -197,44 +171,86 @@ def handle_stream_event(event):
     def process_content_block_delta(event):
         """Process content block delta events."""
         if hasattr(event, "delta") and event.delta:
-            output_callback({"type": "delta", "delta": event.delta})
+            # For text deltas, extract just the text content
+            if hasattr(event.delta, "type") and event.delta.type == "text_delta":
+                output_callback({"type": "text", "text": event.delta.text})
+            # For other delta types, pass through but format better
+            else:
+                output_callback({"type": "delta", "content": str(event.delta)})
 
     def process_tool_progress(event):
         """Process tool progress events."""
         if hasattr(event, "progress"):
             output_callback({"type": "progress", "progress": event.progress})
 
+    def handle_stream_event(event):
+        """Process streaming events and filter for meaningful content only."""
+        # Skip events that shouldn't be displayed
+        if event.type in ("message_start", "message_stop", "signature_delta", "input_json_delta"):
+            return
+
+        # For thinking events, only send if content exists
+        if event.type == "thinking" and hasattr(event, "thinking") and event.thinking:
+            output_callback({"type": "thinking", "thinking": event.thinking})
+
+        # For thinking delta events, extract actual content
+        elif event.type == "thinking_delta" and hasattr(event, "thinking_delta"):
+            delta = event.thinking_delta
+            thinking = getattr(delta, "thinking", None)
+            if thinking:
+                output_callback({"type": "thinking", "thinking": thinking})
+
+        # For text events, send only if text exists
+        elif event.type == "text" and hasattr(event, "text") and event.text:
+            output_callback({"type": "text", "text": event.text})
+
+        # For tool use events, ensure all properties exist
+        elif event.type == "content_block_start" and hasattr(event, "content_block"):
+            content_block = event.content_block
+            if (getattr(content_block, "type", None) == "tool_use" and
+                    hasattr(content_block, "input") and
+                    hasattr(content_block, "name")):
+                output_callback({
+                    "type": "tool_use",
+                    "name": content_block.name,
+                    "input": content_block.input or {}
+                })
+
+        # For delta events, only handle text deltas with content
+        elif event.type == "content_block_delta" and hasattr(event, "delta"):
+            delta = event.delta
+            if (getattr(delta, "type", None) == "text_delta" and
+                    hasattr(delta, "text") and delta.text):
+                output_callback({"type": "text", "text": delta.text})
+
+        # For tool progress, send only if progress exists
+        elif event.type == "tool_use_progress" and hasattr(event, "progress"):
+            output_callback({"type": "progress", "progress": str(event.progress)})
+
     async def stream_response(client, params):
         """Stream the response and track the full message."""
         full_response = None
-
         async with client.beta.messages.stream(**params) as stream:
             async for event in stream:
                 handle_stream_event(event)
-
-                # Track message state
                 if event.type == "message_start":
                     full_response = event.message
                 elif event.type == "message_stop" and hasattr(event, "message"):
                     full_response = event.message
-
         return full_response
 
     async def execute_tool(content_block):
         """Execute a tool and process its result."""
         if content_block["type"] != "tool_use":
             return None
-
         try:
             result = await tool_collection.run(
                 name=content_block["name"],
                 tool_input=cast(dict[str, Any], content_block["input"]),
             )
-
             tool_output_callback(result, content_block["id"])
             return _make_api_tool_result(result, content_block["id"])
         except Exception as e:
-            # Handle tool execution errors
             error_result = ToolResult(
                 error=f"Tool execution error: {str(e)}",
                 output=None,
@@ -247,12 +263,10 @@ def handle_stream_event(event):
     async def process_tools(response_params):
         """Process all tool calls in the response."""
         tool_results = []
-
         for block in response_params:
             tool_result = await execute_tool(block)
             if tool_result:
                 tool_results.append(tool_result)
-
         return tool_results
 
     def handle_error(error):
@@ -269,38 +283,27 @@ def handle_stream_event(event):
         tool_collection = setup_tool_collection()
         system = create_system_prompt()
         client = get_api_client()
-
-        # Configure API call
         betas = get_beta_flags()
         system = configure_prompt_caching(system, betas)
 
-        # Handle image filtering if needed
         image_limit = 0 if provider == APIProvider.ANTHROPIC else only_n_most_recent_images
         if image_limit:
             _maybe_filter_to_n_most_recent_images(
                 messages, image_limit, min_removal_threshold=image_limit
             )
 
-        # Prepare API parameters and execute
         api_params = prepare_api_parameters(system, tool_collection, betas)
 
         try:
-            # Process streaming response
             full_response = await stream_response(client, api_params)
-
-            # Add assistant response to messages
             response_params = _response_to_params(full_response)
             messages.append({"role": "assistant", "content": response_params})
 
-            # Process tool calls
             tool_results = await process_tools(response_params)
-
             if not tool_results:
                 return messages
 
-            # Add tool results to messages
             messages.append({"content": tool_results, "role": "user"})
-
         except Exception as e:
             handle_error(e)
             return messages

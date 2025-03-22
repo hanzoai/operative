@@ -427,95 +427,105 @@ def _render_error(error: Exception):
     st.error(f"**{error.__class__.__name__}**\n\n{body}")
 
 
-#def _render_message(sender: Sender, msg: str | BetaContentBlockParam | ToolResult):
-#    """
-#    Render a message in the Streamlit chat.
-#    """
-#    is_tool_result = not isinstance(msg, str | dict)
-#    if not msg or (is_tool_result and st.session_state.hide_images and not hasattr(msg, "error") and not hasattr(msg, "output")):
-#        return
-#    with st.chat_message(sender):
-#        if is_tool_result:
-#            msg = cast(ToolResult, msg)
-#            if msg.output:
-#                if msg.__class__.__name__ == "CLIResult":
-#                    st.code(msg.output)
-#                else:
-#                    st.markdown(msg.output)
-#            if msg.error:
-#                st.error(msg.error)
-#            if msg.base64_image and not st.session_state.hide_images:
-#                st.image(base64.b64decode(msg.base64_image))
-#        elif isinstance(msg, dict):
-#            if msg.get("type") == "text":
-#                text = msg.get("text", "")
-#                st.markdown(text)
-#            elif msg.get("type") == "thinking":
-#                st.markdown(f"**[Thinking]**\n\n{msg.get('thinking', '')}")
-#            elif msg.get("type") == "tool_use":
-#                st.code(f"Tool Use: {msg.get('name')}\nInput: {msg.get('input')}")
-#            else:
-#                st.json(msg)
-#        else:
-#            st.markdown(msg)
-
 def _render_message(sender: Sender, msg: str | BetaContentBlockParam | ToolResult):
-    """
-    Render a message in the Streamlit chat.
-    For the assistant, if the message is a text block, accumulate text into one bubble.
-    """
-    # Determine if msg is a tool result (not str or dict)
+    """Render a message with proper state management to prevent duplication."""
+    # Skip empty or hidden content
     is_tool_result = not isinstance(msg, (str, dict))
-
-    # If no message, or if it's a tool result that's hidden, return early.
-    if not msg or (is_tool_result and st.session_state.hide_images and not hasattr(msg, "error") and not hasattr(msg, "output")):
+    if not msg or (is_tool_result and st.session_state.hide_images and
+                  not getattr(msg, "error", None) and not getattr(msg, "output", None)):
         return
 
-    # For the assistant, accumulate text if it's a text message.
-    if sender == Sender.BOT and isinstance(msg, dict) and msg.get("type") == "text":
-        # Initialize accumulator and container if not present
-        if "current_assistant_text" not in st.session_state:
-            st.session_state.current_assistant_text = ""
-        if "assistant_container" not in st.session_state:
-            st.session_state.assistant_container = st.chat_message(sender)
-            st.session_state.assistant_placeholder = st.session_state.assistant_container.empty()
-        # Append new text to the accumulator
-        st.session_state.current_assistant_text += msg.get("text", "")
-        # Update the placeholder with the complete accumulated text
-        st.session_state.assistant_placeholder.markdown(st.session_state.current_assistant_text)
-        return  # We already updated the bubble, so exit early
+    # ASSISTANT MESSAGES - use special handling for streaming
+    if sender == Sender.BOT:
+        # Initialize state for this bot turn if needed
+        if "current_bot_turn" not in st.session_state:
+            st.session_state.current_bot_turn = {
+                "container": st.chat_message(sender),
+                "text": "",
+                "thinking": "",
+                "tools": {},
+                "placeholders": {"text": None, "thinking": None}
+            }
 
-    # For non-streaming assistant messages or other senders, clear any previous accumulation.
-    if sender == Sender.BOT and "current_assistant_text" in st.session_state:
-        # Remove the current accumulation so that the next assistant response starts fresh.
-        st.session_state.pop("current_assistant_text")
-        st.session_state.pop("assistant_container", None)
-        st.session_state.pop("assistant_placeholder", None)
+        turn = st.session_state.current_bot_turn
 
-    # For tool results, render accordingly.
-    with st.chat_message(sender):
-        if is_tool_result:
-            msg = cast(ToolResult, msg)
-            if msg.output:
-                if msg.__class__.__name__ == "CLIResult":
-                    st.code(msg.output)
-                else:
-                    st.markdown(msg.output)
-            if msg.error:
-                st.error(msg.error)
-            if msg.base64_image and not st.session_state.hide_images:
-                st.image(base64.b64decode(msg.base64_image))
-        elif isinstance(msg, dict):
-            if msg.get("type") == "text":
+        # Process different message types
+        if isinstance(msg, dict):
+            msg_type = msg.get("type")
+
+            # Text messages - accumulate without duplication
+            if msg_type == "text" and msg.get("text"):
+                new_text = msg.get("text", "")
+                # Only add text that isn't already in the accumulated text
+                if new_text not in turn["text"]:
+                    turn["text"] += new_text
+
+                # Create or update text placeholder
+                with turn["container"]:
+                    if not turn["placeholders"]["text"]:
+                        turn["placeholders"]["text"] = st.empty()
+                    turn["placeholders"]["text"].markdown(turn["text"])
+
+            # Thinking messages
+            elif msg_type == "thinking" and msg.get("thinking"):
+                thinking_text = msg.get("thinking", "")
+                if thinking_text != turn["thinking"]:  # Only update if changed
+                    turn["thinking"] = thinking_text
+                    with turn["container"]:
+                        if not turn["placeholders"]["thinking"]:
+                            turn["placeholders"]["thinking"] = st.empty()
+                        turn["placeholders"]["thinking"].info(f"**Thinking:**\n{turn['thinking']}")
+
+            # Tool use messages
+            elif msg_type == "tool_use" and msg.get("name") and msg.get("input"):
+                tool_id = msg.get("id", f"{msg.get('name')}_{hash(str(msg.get('input')))}")
+
+                # Only display each tool once
+                if tool_id not in turn["tools"]:
+                    turn["tools"][tool_id] = True
+                    with turn["container"]:
+                        st.subheader(f"Tool: {msg.get('name')}")
+
+                        # Format based on tool type
+                        if msg.get('name') == "bash":
+                            command = msg.get('input', {}).get('command', '')
+                            if command:
+                                st.code(f"$ {command}", language="bash")
+                        else:
+                            st.json(msg.get('input', {}))
+
+    # USER MESSAGES - reset bot state
+    elif sender == Sender.USER:
+        # Clear bot state for new conversation turn
+        if "current_bot_turn" in st.session_state:
+            del st.session_state.current_bot_turn
+
+        # Render user message
+        with st.chat_message(sender):
+            if isinstance(msg, str):
+                st.markdown(msg)
+            elif isinstance(msg, dict) and msg.get("type") == "text":
                 st.markdown(msg.get("text", ""))
-            elif msg.get("type") == "thinking":
-                st.markdown(f"**[Thinking]**\n\n{msg.get('thinking', '')}")
-            elif msg.get("type") == "tool_use":
-                st.code(f"Tool Use: {msg.get('name')}\nInput: {msg.get('input')}")
             else:
-                st.json(msg)
-        else:
-            st.markdown(msg)
+                st.write(msg)
+
+    # TOOL RESULTS - render with expanders
+    elif sender == Sender.TOOL:
+        with st.chat_message(sender):
+            tool_msg = cast(ToolResult, msg)
+
+            # Create expandable output section
+            with st.expander("**Tool Result**", expanded=True):
+                if getattr(tool_msg, "output", None):
+                    if tool_msg.__class__.__name__ == "CLIResult":
+                        st.code(tool_msg.output)
+                    else:
+                        st.markdown(tool_msg.output)
+                if getattr(tool_msg, "error", None):
+                    st.error(tool_msg.error)
+                if getattr(tool_msg, "base64_image", None) and not st.session_state.hide_images:
+                    st.image(base64.b64decode(tool_msg.base64_image))
+
 
 if __name__ == "__main__":
     asyncio.run(main())
