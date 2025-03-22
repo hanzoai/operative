@@ -428,23 +428,24 @@ def _render_error(error: Exception):
 
 
 def _render_message(sender: Sender, msg: str | BetaContentBlockParam | ToolResult):
-    """Render a message with proper state management to prevent duplication."""
-    # Skip empty or hidden content
+    """Render a message with collapsible thinking sections similar to Claude's UI."""
+    # Skip empty content
     is_tool_result = not isinstance(msg, (str, dict))
     if not msg or (is_tool_result and st.session_state.hide_images and
                   not getattr(msg, "error", None) and not getattr(msg, "output", None)):
         return
 
-    # ASSISTANT MESSAGES - use special handling for streaming
+    # ASSISTANT MESSAGES
     if sender == Sender.BOT:
-        # Initialize state for this bot turn if needed
+        # Initialize state for this bot turn
         if "current_bot_turn" not in st.session_state:
             st.session_state.current_bot_turn = {
                 "container": st.chat_message(sender),
                 "text": "",
                 "thinking": "",
+                "has_thinking": False,
                 "tools": {},
-                "placeholders": {"text": None, "thinking": None}
+                "placeholders": {"text": None}
             }
 
         turn = st.session_state.current_bot_turn
@@ -453,40 +454,41 @@ def _render_message(sender: Sender, msg: str | BetaContentBlockParam | ToolResul
         if isinstance(msg, dict):
             msg_type = msg.get("type")
 
-            # Text messages - accumulate without duplication
-            if msg_type == "text" and msg.get("text"):
+            # Handle thinking messages in collapsible section
+            if msg_type == "thinking" and msg.get("thinking"):
+                thinking_text = msg.get("thinking", "")
+                if not turn["has_thinking"]:
+                    turn["has_thinking"] = True
+                    with turn["container"]:
+                        # Create collapsible thinking section
+                        with st.expander("🤔 Thinking...", expanded=True):
+                            thinking_placeholder = st.empty()
+                            thinking_placeholder.markdown(thinking_text)
+                            turn["placeholders"]["thinking"] = thinking_placeholder
+                elif thinking_text != turn["thinking"]:
+                    turn["thinking"] = thinking_text
+                    turn["placeholders"]["thinking"].markdown(thinking_text)
+
+            # Handle text messages below thinking section
+            elif msg_type == "text" and msg.get("text"):
                 new_text = msg.get("text", "")
-                # Only add text that isn't already in the accumulated text
                 if new_text not in turn["text"]:
                     turn["text"] += new_text
 
-                # Create or update text placeholder
                 with turn["container"]:
                     if not turn["placeholders"]["text"]:
                         turn["placeholders"]["text"] = st.empty()
                     turn["placeholders"]["text"].markdown(turn["text"])
 
-            # Thinking messages
-            elif msg_type == "thinking" and msg.get("thinking"):
-                thinking_text = msg.get("thinking", "")
-                if thinking_text != turn["thinking"]:  # Only update if changed
-                    turn["thinking"] = thinking_text
-                    with turn["container"]:
-                        if not turn["placeholders"]["thinking"]:
-                            turn["placeholders"]["thinking"] = st.empty()
-                        turn["placeholders"]["thinking"].info(f"**Thinking:**\n{turn['thinking']}")
-
             # Tool use messages
             elif msg_type == "tool_use" and msg.get("name") and msg.get("input"):
                 tool_id = msg.get("id", f"{msg.get('name')}_{hash(str(msg.get('input')))}")
 
-                # Only display each tool once
                 if tool_id not in turn["tools"]:
                     turn["tools"][tool_id] = True
                     with turn["container"]:
                         st.subheader(f"Tool: {msg.get('name')}")
 
-                        # Format based on tool type
                         if msg.get('name') == "bash":
                             command = msg.get('input', {}).get('command', '')
                             if command:
@@ -494,13 +496,12 @@ def _render_message(sender: Sender, msg: str | BetaContentBlockParam | ToolResul
                         else:
                             st.json(msg.get('input', {}))
 
-    # USER MESSAGES - reset bot state
+    # USER MESSAGES
     elif sender == Sender.USER:
         # Clear bot state for new conversation turn
         if "current_bot_turn" in st.session_state:
             del st.session_state.current_bot_turn
 
-        # Render user message
         with st.chat_message(sender):
             if isinstance(msg, str):
                 st.markdown(msg)
@@ -509,12 +510,11 @@ def _render_message(sender: Sender, msg: str | BetaContentBlockParam | ToolResul
             else:
                 st.write(msg)
 
-    # TOOL RESULTS - render with expanders
+    # TOOL RESULTS
     elif sender == Sender.TOOL:
         with st.chat_message(sender):
             tool_msg = cast(ToolResult, msg)
 
-            # Create expandable output section
             with st.expander("**Tool Result**", expanded=True):
                 if getattr(tool_msg, "output", None):
                     if tool_msg.__class__.__name__ == "CLIResult":

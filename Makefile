@@ -13,7 +13,7 @@ setup:
 
 dev:
 	docker run -e ANTHROPIC_API_KEY=$(ANTHROPIC_API_KEY) \
-		-v $(pwd)/operative:/home/operative/.operative/operative \
+		-v ${PWD}/operative:/home/operative/.operative/operative \
 		-v $(HOME)/.anthropic:/home/operative/.anthropic \
 		-p 5900:5900 \
 		-p 8501:8501 \
