@@ -36,7 +36,7 @@ RUN mkdir -p ~/.config/uv && \
     echo 'disable-pip-version-check = true' >> ~/.config/uv/config.toml
 
 # Copy desktop environment/app files
-COPY --chown=$USERNAME:$USERNAME docker/image $HOME/.operative/
+COPY --chown=$USERNAME:$USERNAME docker/image $HOME/
 COPY --chown=$USERNAME:$USERNAME requirements.txt $HOME/.operative/requirements.txt
 COPY --chown=$USERNAME:$USERNAME operative/requirements.txt $HOME/.operative/operative/requirements.txt
 
