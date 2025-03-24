@@ -8,12 +8,16 @@ ENV HOME=/home/$USERNAME
 # Create user only if it doesn't exist
 RUN id -u ${USERNAME} 2>/dev/null || useradd -m -s /bin/bash -d "$HOME" "$USERNAME"
 
-# Ensure home directory exists with proper permissions
-RUN mkdir -p $HOME && chown -R $(id -u ${USERNAME}):$(id -g ${USERNAME}) $HOME
-
 # Set sudo permissions
 RUN echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/operative && \
     chmod 440 /etc/sudoers.d/operative
+
+# Ensure home directory exists with proper permissions
+RUN mkdir -p $HOME && chown -R $(id -u ${USERNAME}):$(id -g ${USERNAME}) $HOME
+
+# Ensure tint2 config exists
+RUN mkdir -p $HOME/.config/tint2 && \
+    cp /etc/xdg/tint2/tint2rc $HOME/.config/tint2/tint2rc
 
 USER ${USERNAME}
 WORKDIR $HOME
@@ -39,6 +43,7 @@ RUN mkdir -p ~/.config/uv && \
 COPY --chown=$USERNAME:$USERNAME docker/image $HOME/
 COPY --chown=$USERNAME:$USERNAME requirements.txt $HOME/.operative/requirements.txt
 COPY --chown=$USERNAME:$USERNAME operative/requirements.txt $HOME/.operative/operative/requirements.txt
+
 
 # Create virtual environment in project directory
 RUN ~/.local/bin/uv venv ~/.operative/.venv && \

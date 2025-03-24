@@ -71,9 +71,6 @@ RUN apt-get update && \
     pcmanfm && \
     sudo apt-get clean
 
-RUN mkdir -p /home/operative/.config/tint2 && \
-    cp /etc/xdg/tint2/tint2rc /home/operative/.config/tint2/tint2rc
-
 # Install noVNC
 RUN git clone --branch v1.6.0 https://github.com/novnc/noVNC.git /opt/noVNC && \
     git clone --branch v0.13.0 https://github.com/novnc/websockify /opt/noVNC/utils/websockify && \
@@ -209,7 +206,7 @@ RUN apt-get update && \
     apt-get install -y python3-distutils python3-venv curl && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
     python3 -m pip install --upgrade pip && \
-    python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    python3 -m pip install hanzp-mcp torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
     python3 -m pip install jupyterlab notebook numpy pandas scikit-learn matplotlib seaborn plotly tqdm transformers datasets ipywidgets
 
 # Install VS Code
@@ -252,18 +249,6 @@ RUN echo '(setq-default dotspacemacs-configuration-layers '\''(\n\
    syntax-checking\n\
    version-control\n\
 ))' > $HOME/.spacemacs
-
-# Setup MCP server
-RUN mkdir -p /opt/mcp-servers
-WORKDIR /opt/mcp-servers
-
-# Copy hanzo-dev-mcp setup script
-COPY docker/hanzo-dev-mcp-setup.sh /opt/mcp-servers/hanzo-dev-mcp-setup.sh
-RUN chmod +x /opt/mcp-servers/hanzo-dev-mcp-setup.sh
-
-# Copy the MCP server startup script
-COPY docker/start_mcp_servers.sh /opt/mcp-servers/start_mcp_servers.sh
-RUN chmod +x /opt/mcp-servers/start_mcp_servers.sh
 
 # Return to root directory
 WORKDIR /
