@@ -1,31 +1,20 @@
 #!/bin/bash
 
-# Run the hanzo-dev-mcp setup script if needed
-if [ ! -f "/etc/systemd/system/hanzo-dev-mcp.service" ]; then
+# Setup hanzo-dev-mcp if not already done
+if [ ! -f "/opt/mcp-servers/hanzo-dev-mcp-bin" ]; then
   echo "Setting up hanzo-dev-mcp..."
   /opt/mcp-servers/hanzo-dev-mcp-setup.sh
 fi
 
-# Start MCP servers
-# If systemd service exists, use it; otherwise start manually
-if [ -f "/etc/systemd/system/hanzo-dev-mcp.service" ]; then
-  systemctl start hanzo-dev-mcp.service
-else
-  # Fallback to manual start
-  /opt/mcp-servers/hanzo-dev-mcp-bin --allowed-paths /home/operative &
-fi
+# Start hanzo-dev-mcp directly (don't use systemd in containers)
+/opt/mcp-servers/hanzo-dev-mcp-bin &
 
-/usr/local/bin/modelcontextprotocol-server-filesystem --allow-paths /home/operative &
-/usr/local/bin/modelcontextprotocol-server-postgres &
-
-echo "MCP servers started successfully"
-
-# Wait a moment to ensure servers are started
+# Give the server time to start
 sleep 2
 
-# Check if hanzo-dev-mcp is running
+# Verify it's running
 if pgrep -f "hanzo-dev-mcp" > /dev/null; then
-  echo "hanzo-dev-mcp is running"
+  echo "✅ hanzo-dev-mcp is running"
 else
-  echo "WARNING: hanzo-dev-mcp failed to start"
+  echo "❌ WARNING: hanzo-dev-mcp failed to start"
 fi

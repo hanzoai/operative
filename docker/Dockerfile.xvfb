@@ -253,13 +253,9 @@ RUN echo '(setq-default dotspacemacs-configuration-layers '\''(\n\
    version-control\n\
 ))' > $HOME/.spacemacs
 
-# Create a directory for MCP servers
+# Setup MCP server
 RUN mkdir -p /opt/mcp-servers
 WORKDIR /opt/mcp-servers
-
-# Install essential MCP servers
-RUN npm install -g @modelcontextprotocol/server-filesystem
-RUN npm install -g @modelcontextprotocol/server-postgres
 
 # Copy hanzo-dev-mcp setup script
 COPY docker/hanzo-dev-mcp-setup.sh /opt/mcp-servers/hanzo-dev-mcp-setup.sh

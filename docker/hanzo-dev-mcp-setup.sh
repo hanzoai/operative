@@ -1,26 +1,30 @@
 #!/bin/bash
 
-# This script installs the hanzo-dev-mcp server
+# This script installs and configures the hanzo-dev-mcp server
 
-# Clone the repository
-if [ ! -d "/opt/mcp-servers/hanzo-dev-mcp" ]; then
-  echo "Cloning hanzo-dev-mcp repository..."
-  mkdir -p /opt/mcp-servers/hanzo-dev-mcp
-  git clone https://github.com/hanzoai/dev-mcp.git /opt/mcp-servers/hanzo-dev-mcp || {
-    echo "Failed to clone repository. Using npm package instead..."
-    cd /opt/mcp-servers
-    npm init -y
-    npm install --save hanzo-dev-mcp
-    mkdir -p /opt/mcp-servers/node_modules/hanzo-dev-mcp/bin
-    echo '#!/bin/bash
+# Create NPM package directory
+mkdir -p /opt/mcp-servers
+cd /opt/mcp-servers
 
-NODE_PATH=/opt/mcp-servers/node_modules node /opt/mcp-servers/node_modules/hanzo-dev-mcp/dist/server.js "$@"' > /opt/mcp-servers/hanzo-dev-mcp-bin
-    chmod +x /opt/mcp-servers/hanzo-dev-mcp-bin
-  }
+# Create package.json if it doesn't exist
+if [ ! -f "package.json" ]; then
+  npm init -y
 fi
 
+# Install hanzo-dev-mcp
+npm install --save hanzo-dev-mcp
+
+# Create executable script
+cat > /opt/mcp-servers/hanzo-dev-mcp-bin << 'EOL'
+#!/bin/bash
+
+NODE_PATH=/opt/mcp-servers/node_modules node /opt/mcp-servers/node_modules/hanzo-dev-mcp/dist/server.js --allowed-paths /home/operative "$@"
+EOL
+
+chmod +x /opt/mcp-servers/hanzo-dev-mcp-bin
+
 # Create systemd service file
-cat > /etc/systemd/system/hanzo-dev-mcp.service << EOL
+cat > /etc/systemd/system/hanzo-dev-mcp.service << 'EOL'
 [Unit]
 Description=Hanzo Dev MCP Server
 After=network.target
@@ -29,19 +33,29 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/opt/mcp-servers
-ExecStart=/opt/mcp-servers/hanzo-dev-mcp-bin --allowed-paths /home/operative
+ExecStart=/opt/mcp-servers/hanzo-dev-mcp-bin
 Restart=on-failure
 RestartSec=10
-StandardOutput=syslog
-StandardError=syslog
+StandardOutput=journal
+StandardError=journal
 SyslogIdentifier=hanzo-dev-mcp
 
 [Install]
 WantedBy=multi-user.target
 EOL
 
-# Enable and start the service
-systemctl enable hanzo-dev-mcp.service
-systemctl start hanzo-dev-mcp.service
+# Create startup script
+cat > /opt/mcp-servers/start-hanzo-mcp.sh << 'EOL'
+#!/bin/bash
 
-echo "hanzo-dev-mcp server installed and configured to start at boot"
+# Start hanzo-dev-mcp in the background
+/opt/mcp-servers/hanzo-dev-mcp-bin &
+
+# Wait and verify it's running
+sleep 2
+pgrep -f "hanzo-dev-mcp" > /dev/null && echo "hanzo-dev-mcp started successfully" || echo "Failed to start hanzo-dev-mcp"
+EOL
+
+chmod +x /opt/mcp-servers/start-hanzo-mcp.sh
+
+echo "hanzo-dev-mcp server installed and configured"

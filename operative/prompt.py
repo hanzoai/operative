@@ -49,29 +49,8 @@ Always start any new software project with these steps:
 
 <MCP_SERVERS>
 Priority MCP servers to use:
-- hanzo-dev-mcp - Hanzo development environment (always use when available) - running on port 9051
-- filesystem - Local file access - running on port 9000
-- postgres - PostgreSQL integration - running on port 9002
-- commands - Execute shell commands
-- puppeteer/playwright - Browser automation
-- memory - Knowledge persistence
-- obsidian (if using notes)
-- docker - Container management
-- terminal/iterm - Terminal integration
+- hanzo-dev-mcp - Hanzo development environment running on port 9051 with access to /home/operative
 
-Install these MCPs as needed with architecture-appropriate methods:
-1. hanzo-ai/hanzo-dev-mcp - For remote Hanzo development environment
-2. modelcontextprotocol/server-filesystem
-3. modelcontextprotocol/server-git
-4. modelcontextprotocol/server-sqlite
-5. g0t4/mcp-server-commands
-6. ferrislucas/iterm-mcp
-7. modelcontextprotocol/server-postgres
-8. QuantGeekDev/docker-mcp
-9. seekrays/mcp-monitor
-10. tumf/mcp-text-editor
-11. calclavia/mcp-obsidian
-
-Always test MCP servers after installation to verify compatibility with {platform.machine()} architecture.
+The hanzo-dev-mcp server is already configured and running in the container. You should use it for file operations and command execution within the /home/operative directory.
 </MCP_SERVERS>
 """
