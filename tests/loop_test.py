@@ -1,4 +1,6 @@
 from unittest import mock
+import asyncio
+import pytest
 
 from anthropic.types import TextBlock, ToolUseBlock
 from anthropic.types.beta import BetaMessage, BetaMessageParam, BetaTextBlockParam
@@ -6,7 +8,7 @@ from anthropic.types.beta import BetaMessage, BetaMessageParam, BetaTextBlockPar
 from operative.loop import APIProvider, sampling_loop
 
 
-async def test_loop():
+async def test_loop(event_loop):
     client = mock.Mock()
     client.beta = mock.Mock()
     client.beta.messages = mock.Mock()
@@ -57,3 +59,19 @@ async def test_loop():
         
         # Verify tool collection was created
         assert tool_collection.to_params.called
+        
+        # Clean up any pending coroutines to avoid warnings
+        _cleanup_mock_coroutines(client)
+        _cleanup_mock_coroutines(tool_collection)
+
+
+def _cleanup_mock_coroutines(mock_obj):
+    """Helper function to clean up any pending coroutines in mock objects."""
+    if hasattr(mock_obj, '_mock_awaited') and mock_obj._mock_awaited:
+        # Already awaited, nothing to do
+        return
+        
+    # Recursively clean up any child mocks
+    for name, value in mock_obj._mock_children.items():
+        if isinstance(value, mock.AsyncMock):
+            _cleanup_mock_coroutines(value)
