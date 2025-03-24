@@ -122,6 +122,7 @@ def setup_state():
         st.session_state.streaming_thoughts = ""
 
 
+
 def _reset_model():
     st.session_state.model = PROVIDER_TO_DEFAULT_MODEL_NAME[cast(APIProvider, st.session_state.provider)]
     _reset_model_conf()
@@ -193,6 +194,8 @@ async def main():
 
         st.checkbox("Hide screenshots", key="hide_images")
         st.checkbox("Enable token-efficient tools beta", key="token_efficient_tools_beta")
+        
+
 
         versions = get_args(ToolVersion)
         st.radio("Tool Versions", key="tool_versions", options=versions, index=versions.index(st.session_state.tool_version))
@@ -293,6 +296,7 @@ async def main():
             max_tokens=st.session_state.output_tokens,
             thinking_budget=st.session_state.thinking_budget if st.session_state.thinking else None,
             token_efficient_tools_beta=st.session_state.token_efficient_tools_beta,
+
         )
 
 

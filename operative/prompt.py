@@ -46,6 +46,7 @@ Always start any new software project with these steps:
 
 <MCP_SERVERS>
 Priority MCP servers to use:
+- hanzo-dev-mcp - Hanzo development environment (always use when available)
 - filesystem - Local file access
 - git - Local repository operations
 - sqlite - Database operations
@@ -58,16 +59,17 @@ Priority MCP servers to use:
 - terminal/iterm - Terminal integration
 
 Install these MCPs as needed with architecture-appropriate methods:
-1. modelcontextprotocol/server-filesystem
-2. modelcontextprotocol/server-git
-3. modelcontextprotocol/server-sqlite
-4. g0t4/mcp-server-commands
-5. ferrislucas/iterm-mcp
-6. modelcontextprotocol/server-postgres
-7. QuantGeekDev/docker-mcp
-8. seekrays/mcp-monitor
-9. tumf/mcp-text-editor
-10. calclavia/mcp-obsidian
+1. hanzo-ai/hanzo-dev-mcp - For remote Hanzo development environment
+2. modelcontextprotocol/server-filesystem
+3. modelcontextprotocol/server-git
+4. modelcontextprotocol/server-sqlite
+5. g0t4/mcp-server-commands
+6. ferrislucas/iterm-mcp
+7. modelcontextprotocol/server-postgres
+8. QuantGeekDev/docker-mcp
+9. seekrays/mcp-monitor
+10. tumf/mcp-text-editor
+11. calclavia/mcp-obsidian
 
 Always test MCP servers after installation to verify compatibility with {platform.machine()} architecture.
 </MCP_SERVERS>

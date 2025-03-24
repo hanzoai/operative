@@ -64,6 +64,7 @@ async def sampling_loop(
     tool_version: ToolVersion,
     thinking_budget: int | None = None,
     token_efficient_tools_beta: bool = False,
+
 ) -> list[dict]:
     """Agentic sampling loop for assistant/tool interaction of computer use."""
 

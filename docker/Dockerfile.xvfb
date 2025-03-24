@@ -254,13 +254,31 @@ RUN echo '(setq-default dotspacemacs-configuration-layers '\''(\n\
 ))' > $HOME/.spacemacs
 
 # Create a directory for MCP servers
-mkdir -p /opt/mcp-servers
-cd /opt/mcp-servers
+RUN mkdir -p /opt/mcp-servers
+WORKDIR /opt/mcp-servers
 
 # Install essential MCP servers
-npm install -g @modelcontextprotocol/server-filesystem
-npm install -g @modelcontextprotocol/server-git
-npm install -g g0t4/mcp-server-commands
-npm install -g tumf/mcp-text-editor
+RUN npm install -g @modelcontextprotocol/server-filesystem
+RUN npm install -g @modelcontextprotocol/server-git
+RUN npm install -g g0t4/mcp-server-commands
+RUN npm install -g tumf/mcp-text-editor
+RUN npm install -g hanzo-ai/hanzo-dev-mcp
+
+# Create startup script for MCP servers
+RUN echo '#!/bin/bash
+
+# Start MCP servers
+hanzo-dev-mcp &
+modelcontextprotocol-server-filesystem &
+modelcontextprotocol-server-git &
+mcp-server-commands &
+mcp-text-editor &
+
+echo "MCP servers started successfully"' > /opt/mcp-servers/start_mcp_servers.sh
+
+RUN chmod +x /opt/mcp-servers/start_mcp_servers.sh
+
+# Return to root directory
+WORKDIR /
 
 ENTRYPOINT ["bash"]
