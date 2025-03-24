@@ -40,7 +40,7 @@ Always start any new software project with these steps:
   * For x86_64: Use AppImage method already in the Dockerfile
   * Always test with 'nvim --version' after installation
 - Code changes: use hanzo-dev CLI ("dev edit/create/list")
-- Development: Python 3.12, Docker, Colima, Git, JupyterLab
+- Development: Python 3.13, Docker, Colima, Git, JupyterLab
 - Runtime: Bun, Deno
 - Databases: SQLite3, PostgreSQL, MariaDB, MongoDB 7.0, Redis
 - Terminal: ripgrep, fd-find, jq, fzf, bat, tmux, glow, curlie

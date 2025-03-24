@@ -7,11 +7,12 @@ name = "operative"
 version = "0.1.0"
 description = "Autonomous agent using Anthropic Claude API with a containerized environment"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 license = { text = "MIT" }
 authors = [{ name = "Hanzo Dev", email = "dev@hanzo.ai" }]
 classifiers = [
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
@@ -46,7 +47,7 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py313"
 select = ["E", "F", "I"]
 ignore = []
 

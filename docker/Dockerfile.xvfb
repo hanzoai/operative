@@ -27,10 +27,11 @@ RUN apt-get update && \
     mutter \
     x11vnc \
     build-essential \
-    python3.12 \
-    python3.12-dev \
-    python3.12-venv \
-    python3-pip \
+    python3.13 \
+    python3.13-dev \
+    python3.13-venv \
+    python3.13-distutils \
+    python3.13-pip \
     libssl-dev \
     zlib1g-dev \
     libbz2-dev \
@@ -203,11 +204,8 @@ RUN sudo ln -sf /usr/bin/python3.12 /usr/local/bin/python && \
 
 # Machine Learning essentials - PyTorch, Jupyter, NumPy, Pandas, etc.
 RUN apt-get update && \
-    apt-get install -y python3-distutils python3-venv curl && \
-    curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
-    python3 -m pip install --upgrade pip && \
     python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
-    python3 -m pip install jupyterlab notebook numpy pandas scikit-learn matplotlib seaborn plotly tqdm transformers datasets ipywidgets
+    python3 -m pip install hanzo-mcp jupyterlab notebook numpy pandas scikit-learn matplotlib seaborn plotly tqdm transformers datasets ipywidgets
 
 # Install VS Code
 RUN wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
@@ -249,22 +247,6 @@ RUN echo '(setq-default dotspacemacs-configuration-layers '\''(\n\
    syntax-checking\n\
    version-control\n\
 ))' > $HOME/.spacemacs
-
-# Setup MCP server
-RUN mkdir -p /opt/mcp-servers
-WORKDIR /opt/mcp-servers
-
-# Install hanzo-mcp
-RUN pip install hanzo-mcp
-
-# Setup required directories
-RUN mkdir -p /home/operative/.operative /home/operative/.config/fish/conf.d
-RUN chown -R root:root /home/operative/.config
-
-# Copy hanzo-mcp script
-COPY docker/hanzo-mcp-fix.sh /opt/mcp-servers/hanzo-mcp.sh
-RUN chmod +x /opt/mcp-servers/hanzo-mcp.sh
-RUN ln -s /opt/mcp-servers/hanzo-mcp.sh /home/operative/.operative/hanzo-mcp.sh
 
 # Return to root directory
 WORKDIR /
