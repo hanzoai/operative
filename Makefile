@@ -1,4 +1,4 @@
-.PHONY: build build-desktop build-xvfb push push-desktop push-xvfb run run-docker run-desktop run-xvfb all all-desktop all-xvfb setup
+.PHONY: build build-desktop build-xvfb push push-desktop push-xvfb run run-docker run-desktop run-xvfb all all-desktop all-xvfb setup test test-cov install-test install-dev
 
 # Setup Python environment with uv
 setup:
@@ -60,6 +60,28 @@ run-xvfb:
 		-v $(HOME)/.anthropic:/home/operative/.anthropic \
 		-p 5900:5900 -p 8501:8501 -p 6080:6080 -p 8080:8080 \
 		-it ghcr.io/hanzoai/xvfb:latest
+
+# Testing targets
+install-dev:
+	uv venv --python=python3.12 .venv
+	. .venv/bin/activate && uv pip install -e ".[dev]"
+	. .venv/bin/activate && pre-commit install
+
+install-test:
+	uv venv --python=python3.12 .venv
+	. .venv/bin/activate && uv pip install -e ".[test]"
+
+test:
+	python3 -m pytest tests/
+
+test-cov:
+	python3 -m pytest tests/ --cov=operative --cov-report=term-missing
+
+lint:
+	ruff check operative/ tests/
+
+format:
+	ruff format operative/ tests/
 
 # Build, push, then run targets
 all: build push run-docker

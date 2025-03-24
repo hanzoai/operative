@@ -1,7 +1,38 @@
+# Python virtual environments
 .venv
+venv/
+env/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
 .ruff_cache
-__pycache__
 .pytest_cache
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+
+# Local development
 .dev*
+.env
+.env.*
 uv.lock
 dev.md
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+
