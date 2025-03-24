@@ -206,7 +206,7 @@ RUN apt-get update && \
     apt-get install -y python3-distutils python3-venv curl && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
     python3 -m pip install --upgrade pip && \
-    python3 -m pip install hanzp-mcp torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
     python3 -m pip install jupyterlab notebook numpy pandas scikit-learn matplotlib seaborn plotly tqdm transformers datasets ipywidgets
 
 # Install VS Code
@@ -249,6 +249,22 @@ RUN echo '(setq-default dotspacemacs-configuration-layers '\''(\n\
    syntax-checking\n\
    version-control\n\
 ))' > $HOME/.spacemacs
+
+# Setup MCP server
+RUN mkdir -p /opt/mcp-servers
+WORKDIR /opt/mcp-servers
+
+# Install hanzo-mcp
+RUN pip install hanzo-mcp
+
+# Setup required directories
+RUN mkdir -p /home/operative/.operative /home/operative/.config/fish/conf.d
+RUN chown -R root:root /home/operative/.config
+
+# Copy hanzo-mcp script
+COPY docker/hanzo-mcp-fix.sh /opt/mcp-servers/hanzo-mcp.sh
+RUN chmod +x /opt/mcp-servers/hanzo-mcp.sh
+RUN ln -s /opt/mcp-servers/hanzo-mcp.sh /home/operative/.operative/hanzo-mcp.sh
 
 # Return to root directory
 WORKDIR /
