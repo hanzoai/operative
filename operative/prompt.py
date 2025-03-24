@@ -49,11 +49,9 @@ Always start any new software project with these steps:
 
 <MCP_SERVERS>
 Priority MCP servers to use:
-- hanzo-dev-mcp - Hanzo development environment (always use when available)
-- filesystem - Local file access
-- git - Local repository operations
-- sqlite - Database operations
-- postgres - PostgreSQL integration
+- hanzo-dev-mcp - Hanzo development environment (always use when available) - running on port 9051
+- filesystem - Local file access - running on port 9000
+- postgres - PostgreSQL integration - running on port 9002
 - commands - Execute shell commands
 - puppeteer/playwright - Browser automation
 - memory - Knowledge persistence
