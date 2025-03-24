@@ -55,7 +55,7 @@ Please open a github issue if you are need clarification on this policy or you w
 - Avoid inline comments - code should be self-documenting
 - Use type hints for all Python functions
 - Use dataclasses for structured data (see `tools/base.py` for examples)
-- All tools must inherit from `BaseAnthropicTool` and implement required methods
+- All tools must inherit from `BaseTool` and implement required methods
 - Use abstract base classes (ABC) for defining interfaces
 - Handle errors using `ToolError` and `ToolFailure` classes
 
@@ -105,7 +105,7 @@ We use several tools to maintain code quality:
 
 When creating new tools:
 
-1. Inherit from `BaseAnthropicTool`
+1. Inherit from `BaseTool`
 2. Implement `__call__` and `to_params` methods
 3. Use appropriate result types (`ToolResult`, `CLIResult`, or `ToolFailure`)
 4. Add comprehensive tests

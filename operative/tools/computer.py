@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from anthropic.types.beta import BetaToolComputerUse20241022Param, BetaToolUnionParam
 
-from .base import BaseAnthropicTool, ToolError, ToolResult
+from .base import BaseTool, ToolError, ToolResult
 from .run import run
 
 OUTPUT_DIR = "/tmp/outputs"
@@ -285,14 +285,14 @@ class BaseComputerTool:
         return round(x * x_scaling_factor), round(y * y_scaling_factor)
 
 
-class ComputerTool20241022(BaseComputerTool, BaseAnthropicTool):
+class ComputerTool20241022(BaseComputerTool, BaseTool):
     api_type: Literal["computer_20241022"] = "computer_20241022"
 
     def to_params(self) -> BetaToolComputerUse20241022Param:
         return {"name": self.name, "type": self.api_type, **self.options}
 
 
-class ComputerTool20250124(BaseComputerTool, BaseAnthropicTool):
+class ComputerTool20250124(BaseComputerTool, BaseTool):
     api_type: Literal["computer_20250124"] = "computer_20250124"
 
     def to_params(self):

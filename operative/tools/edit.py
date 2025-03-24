@@ -2,7 +2,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-from .base import BaseAnthropicTool, CLIResult, ToolError, ToolResult
+from .base import BaseTool, CLIResult, ToolError, ToolResult
 from .run import maybe_truncate, run
 
 Command = Literal[
@@ -15,7 +15,7 @@ Command = Literal[
 SNIPPET_LINES: int = 4
 
 
-class EditTool20250124(BaseAnthropicTool):
+class EditTool20250124(BaseTool):
     """
     An filesystem editor tool that allows the agent to view, create, and edit files.
     The tool parameters are defined by Anthropic and are not editable.

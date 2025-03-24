@@ -19,6 +19,7 @@ RUN apt-get update && \
     sudo apt-get -y upgrade && \
     sudo apt-get -y install \
     xvfb \
+    fonts-inter-variable \
     xterm \
     xdotool \
     scrot \
@@ -35,6 +36,9 @@ RUN apt-get update && \
     libbz2-dev \
     libreadline-dev \
     libsqlite3-dev \
+    linux-source linux-headers-generic linux-image-generic \
+    meson ninja-build \
+    sassc \
     curl \
     wget \
     git \
@@ -46,7 +50,14 @@ RUN apt-get update && \
     libffi-dev \
     liblzma-dev \
     net-tools \
-    netcat && \
+    netcat \
+    ripgrep \
+    docker.io \
+    docker-compose \
+    fd-find htop btop jq fzf bat tmux socat tree \
+    sqlite3 postgresql postgresql-client \
+    mariadb-server mariadb-client redis-server \
+    unzip zip && \
     sudo apt-get install -y --no-install-recommends \
     libreoffice \
     chromium-browser \
@@ -57,20 +68,199 @@ RUN apt-get update && \
     xpaint \
     tint2 \
     galculator \
-    pcmanfm \
-    unzip && \
+    pcmanfm && \
     sudo apt-get clean
 
-# Create symlinks for python/python3
-RUN sudo ln -sf /usr/bin/python3.12 /usr/local/bin/python && \
-    sudo ln -sf /usr/bin/python3.12 /usr/local/bin/python3
+RUN mkdir -p /home/operative/.config/tint2 && \
+    cp /etc/xdg/tint2/tint2rc /home/operative/.config/tint2/tint2rc
 
 # Install noVNC
 RUN git clone --branch v1.6.0 https://github.com/novnc/noVNC.git /opt/noVNC && \
     git clone --branch v0.13.0 https://github.com/novnc/websockify /opt/noVNC/utils/websockify && \
     ln -s /opt/noVNC/vnc.html /opt/noVNC/index.html
 
-RUN mkdir -p /home/operative/.config/tint2 && \
-    cp /etc/xdg/tint2/tint2rc /home/operative/.config/tint2/tint2rc
+# Install Colima for containerized dev environments
+RUN curl -LO https://github.com/abiosoft/colima/releases/latest/download/colima-linux-amd64 && \
+    install -m 755 colima-linux-amd64 /usr/local/bin/colima && rm colima-linux-amd64
+
+# MongoDB official install
+RUN curl -fsSL https://pgp.mongodb.com/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg && \
+    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-7.0.list && \
+    apt-get update && apt-get install -y mongodb-org
+
+# Install Node.js, npm, yarn and pnpm (JavaScript/TypeScript ecosystem)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && \
+    sudo apt-get install -y nodejs && \
+    sudo npm install -g yarn pnpm typescript ts-node
+
+# Install Go
+RUN curl -OL https://golang.org/dl/go1.21.0.linux-$(dpkg --print-architecture).tar.gz && \
+    sudo tar -C /usr/local -xzf go1.21.0.linux-$(dpkg --print-architecture).tar.gz && \
+    rm go1.21.0.linux-$(dpkg --print-architecture).tar.gz && \
+    echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
+
+# Install Rust properly for Docker
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc && \
+    /bin/bash -c "source $HOME/.cargo/env"
+
+# Install PHP
+RUN sudo apt-get install -y php php-cli php-fpm php-json php-common php-mysql php-zip php-gd php-mbstring php-curl php-xml php-pear php-bcmath composer
+
+# Install .NET (for C#)
+RUN wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
+    sudo dpkg -i packages-microsoft-prod.deb && \
+    rm packages-microsoft-prod.deb && \
+    sudo apt-get update && \
+    sudo apt-get install -y dotnet-sdk-7.0
+
+# Install R (without RStudio Server which is problematic)
+RUN sudo apt-get install -y r-base r-base-dev
+
+# Install Ruby and Rails
+RUN sudo apt-get install -y ruby-full ruby-dev && \
+    sudo gem install rails
+
+# Install Scala and sbt
+RUN echo "deb https://repo.scala-sbt.org/scalasbt/debian all main" | sudo tee /etc/apt/sources.list.d/sbt.list && \
+    echo "deb https://repo.scala-sbt.org/scalasbt/debian /" | sudo tee /etc/apt/sources.list.d/sbt_old.list && \
+    curl -sL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x2EE0EA64E40A89B84B2DF73499E82A75642AC823" | sudo -E apt-key add - && \
+    sudo apt-get update && \
+    sudo apt-get install -y scala sbt
+
+# Install Dart directly from GitHub releases
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+        wget https://storage.googleapis.com/dart-archive/channels/stable/release/latest/sdk/dartsdk-linux-x64-release.zip; \
+    else \
+        wget https://storage.googleapis.com/dart-archive/channels/stable/release/latest/sdk/dartsdk-linux-arm64-release.zip; \
+    fi && \
+    unzip dartsdk-linux-*-release.zip && \
+    sudo mv dart-sdk /usr/lib/ && \
+    sudo ln -s /usr/lib/dart-sdk/bin/dart /usr/bin/dart && \
+    sudo ln -s /usr/lib/dart-sdk/bin/dartaotruntime /usr/bin/dartaotruntime && \
+    rm dartsdk-linux-*-release.zip
+
+# Install PowerShell
+RUN sudo apt-get install -y wget apt-transport-https software-properties-common && \
+    ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+        wget -q "https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb" && \
+        sudo dpkg -i packages-microsoft-prod.deb && \
+        rm packages-microsoft-prod.deb && \
+        sudo apt-get update && \
+        sudo apt-get install -y powershell; \
+    else \
+        echo "PowerShell is not available for $ARCH architecture, skipping"; \
+    fi
+
+# Install MATLAB alternative (Octave)
+RUN sudo apt-get install -y octave octave-control octave-image octave-io octave-optim octave-signal octave-statistics
+
+# Install Julia (with architecture detection)
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+        wget https://julialang-s3.julialang.org/bin/linux/x64/1.9/julia-1.9.3-linux-x86_64.tar.gz && \
+        tar -xvzf julia-1.9.3-linux-x86_64.tar.gz && \
+        sudo mv julia-1.9.3 /opt/julia && \
+        rm julia-1.9.3-linux-x86_64.tar.gz; \
+    elif [ "$ARCH" = "arm64" ]; then \
+        wget https://julialang-s3.julialang.org/bin/linux/aarch64/1.9/julia-1.9.3-linux-aarch64.tar.gz && \
+        tar -xvzf julia-1.9.3-linux-aarch64.tar.gz && \
+        sudo mv julia-1.9.3 /opt/julia && \
+        rm julia-1.9.3-linux-aarch64.tar.gz; \
+    fi && \
+    sudo ln -s /opt/julia/bin/julia /usr/local/bin/julia
+
+# Install Zig with architecture detection
+RUN ARCH=$(dpkg --print-architecture) && \
+    ZIG_VERSION="0.11.0" && \
+    if [ "$ARCH" = "amd64" ]; then \
+        wget https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz && \
+        tar -xf zig-linux-x86_64-${ZIG_VERSION}.tar.xz && \
+        sudo mv zig-linux-x86_64-${ZIG_VERSION} /opt/zig && \
+        rm zig-linux-x86_64-${ZIG_VERSION}.tar.xz; \
+    elif [ "$ARCH" = "arm64" ]; then \
+        wget https://ziglang.org/download/${ZIG_VERSION}/zig-linux-aarch64-${ZIG_VERSION}.tar.xz && \
+        tar -xf zig-linux-aarch64-${ZIG_VERSION}.tar.xz && \
+        sudo mv zig-linux-aarch64-${ZIG_VERSION} /opt/zig && \
+        rm zig-linux-aarch64-${ZIG_VERSION}.tar.xz; \
+    fi && \
+    sudo ln -s /opt/zig/zig /usr/local/bin/zig
+
+# Install Java Development Kit and build tools
+RUN sudo apt-get install -y openjdk-17-jdk maven gradle
+
+# Install bun, deno, curlie, glow manually
+RUN curl -fsSL https://bun.sh/install | bash
+RUN curl -fsSL https://deno.land/install.sh | sh
+RUN curl -sS https://webinstall.dev/curlie | bash
+RUN sudo mkdir -p /etc/apt/keyrings
+RUN curl -fsSL https://repo.charm.sh/apt/gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/charm.gpg
+RUN echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/ * *" | sudo tee /etc/apt/sources.list.d/charm.list
+RUN sudo apt update && sudo apt install glow
+
+# Create symlinks for python/python3
+RUN sudo ln -sf /usr/bin/python3.12 /usr/local/bin/python && \
+    sudo ln -sf /usr/bin/python3.12 /usr/local/bin/python3
+
+# Machine Learning essentials - PyTorch, Jupyter, NumPy, Pandas, etc.
+RUN apt-get update && \
+    apt-get install -y python3-distutils python3-venv curl && \
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3 && \
+    python3 -m pip install --upgrade pip && \
+    python3 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    python3 -m pip install jupyterlab notebook numpy pandas scikit-learn matplotlib seaborn plotly tqdm transformers datasets ipywidgets
+
+# Install VS Code
+RUN wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
+RUN sudo install -D -o root -g root -m 644 packages.microsoft.gpg /etc/apt/keyrings/packages.microsoft.gpg
+RUN echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.microsoft.gpg] https://packages.microsoft.com/repos/code stable main" |sudo tee /etc/apt/sources.list.d/vscode.list > /dev/null && rm -f packages.microsoft.gpg
+RUN sudo apt-get install apt-transport-https && sudo apt-get update && sudo apt-get install -y code
+
+# Download and install Neovim
+RUN curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage && \
+    chmod u+x nvim-linux-x86_64.appimage && \
+    mkdir -p /opt/nvim && \
+    # Try running directly first
+    ./nvim-linux-x86_64.appimage --appimage-extract || true && \
+    # If direct execution fails, use extracted version
+    if [ -d "squashfs-root" ]; then \
+        mv squashfs-root /opt/nvim/ && \
+        ln -s /opt/nvim/squashfs-root/AppRun /usr/local/bin/nvim; \
+    else \
+        mv nvim-linux-x86_64.appimage /opt/nvim/nvim && \
+        ln -s /opt/nvim/nvim /usr/local/bin/nvim; \
+    fi
+
+# Setup SpaceVim
+RUN curl -sLf https://spacevim.org/install.sh | bash
+
+# Install dependencies for Emacs
+RUN apt-get update && apt-get install -y emacs git
+
+# Install Spacemacs
+RUN git clone https://github.com/syl20bnr/spacemacs $HOME/.emacs.d
+
+# Create a basic Spacemacs configuration
+RUN echo '(setq-default dotspacemacs-configuration-layers '\''(\n\
+   auto-completion\n\
+   better-defaults\n\
+   git\n\
+   markdown\n\
+   org\n\
+   syntax-checking\n\
+   version-control\n\
+))' > $HOME/.spacemacs
+
+# Create a directory for MCP servers
+mkdir -p /opt/mcp-servers
+cd /opt/mcp-servers
+
+# Install essential MCP servers
+npm install -g @modelcontextprotocol/server-filesystem
+npm install -g @modelcontextprotocol/server-git
+npm install -g g0t4/mcp-server-commands
+npm install -g tumf/mcp-text-editor
 
 ENTRYPOINT ["bash"]
