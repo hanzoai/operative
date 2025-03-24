@@ -259,23 +259,13 @@ WORKDIR /opt/mcp-servers
 
 # Install essential MCP servers
 RUN npm install -g @modelcontextprotocol/server-filesystem
-RUN npm install -g @modelcontextprotocol/server-git
-RUN npm install -g g0t4/mcp-server-commands
-RUN npm install -g tumf/mcp-text-editor
-RUN npm install -g hanzo-ai/hanzo-dev-mcp
+# RUN npm install -g g0t4/mcp-server-commands
+# RUN npm install -g tumf/mcp-text-editor
+# RUN npm install -g hanzo-ai/hanzo-dev-mcp
+RUN npm install -g @modelcontextprotocol/server-postgres
 
-# Create startup script for MCP servers
-RUN echo '#!/bin/bash
-
-# Start MCP servers
-/usr/local/bin/hanzo-dev-mcp &
-/usr/local/bin/modelcontextprotocol-server-filesystem &
-/usr/local/bin/modelcontextprotocol-server-git &
-/usr/local/bin/mcp-server-commands &
-/usr/local/bin/mcp-text-editor &
-
-echo "MCP servers started successfully"' > /opt/mcp-servers/start_mcp_servers.sh
-
+# Copy the MCP server startup script
+COPY docker/start_mcp_servers.sh /opt/mcp-servers/start_mcp_servers.sh
 RUN chmod +x /opt/mcp-servers/start_mcp_servers.sh
 
 # Return to root directory
