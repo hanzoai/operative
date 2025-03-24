@@ -1,6 +1,6 @@
+import asyncio
 import os
 import warnings
-import asyncio
 from unittest import mock
 
 import pytest

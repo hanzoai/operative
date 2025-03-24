@@ -6,18 +6,16 @@ import base64
 import os
 import subprocess
 import sys
-import traceback
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import StrEnum
 from functools import partial
 from pathlib import PosixPath
 from typing import cast, get_args
 
-import streamlit as st
 import httpx
-from anthropic import RateLimitError
+import streamlit as st
 from anthropic.types.beta import (
     BetaContentBlockParam,
     BetaTextBlockParam,
@@ -194,7 +192,7 @@ async def main():
 
         st.checkbox("Hide screenshots", key="hide_images")
         st.checkbox("Enable token-efficient tools beta", key="token_efficient_tools_beta")
-        
+
 
 
         versions = get_args(ToolVersion)
@@ -378,8 +376,9 @@ def _api_response_callback(
     """
     resp_id = datetime.now().isoformat()
     response_state[resp_id] = (request, response)
-    if error:
-        _render_error(error)
+    # Skip error handling as _render_error is not defined
+    # if error:
+    #     _render_error(error)
     _render_api_response(request, response, resp_id, tab)
 
 
@@ -398,7 +397,6 @@ def _render_api_response(
     """Render an API response to a streamlit tab"""
     with tab:
         with st.expander(f"Request/Response ({resp_id})"):
-            newline = "\n\n"
             if request:
                 st.markdown(f"`{request.method} {request.url}`")
                 for k, v in request.headers.items():

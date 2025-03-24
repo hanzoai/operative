@@ -3,20 +3,18 @@ Agentic sampling loop that calls the Anthropic API using the modern AsyncAnthrop
 and its streaming interface for beta computer use.
 """
 
-import platform
 from collections.abc import Callable
-from datetime import datetime
 from enum import StrEnum
-from typing import cast, Any
+from typing import Any, cast
 
 import httpx
 from anthropic import (
-    AsyncAnthropic,
-    AsyncAnthropicBedrock,
-    AsyncAnthropicVertex,
     APIError,
     APIResponseValidationError,
     APIStatusError,
+    AsyncAnthropic,
+    AsyncAnthropicBedrock,
+    AsyncAnthropicVertex,
 )
 from anthropic.types.beta import (
     BetaCacheControlEphemeralParam,
@@ -30,14 +28,13 @@ from anthropic.types.beta import (
     BetaToolUseBlockParam,
 )
 
+from .prompt import SYSTEM_PROMPT
 from .tools import (
     TOOL_GROUPS_BY_VERSION,
     ToolCollection,
     ToolResult,
     ToolVersion,
 )
-
-from .prompt import SYSTEM_PROMPT
 
 PROMPT_CACHING_BETA_FLAG = "prompt-caching-2024-07-31"
 OUTPUT_128K_BETA_FLAG = "output-128k-2025-02-19"
@@ -234,7 +231,7 @@ async def sampling_loop(
 
     def handle_error(error):
         """Handle API errors with appropriate callback."""
-        if isinstance(error, (APIStatusError, APIResponseValidationError)):
+        if isinstance(error, APIStatusError | APIResponseValidationError):
             api_response_callback(error.request, error.response, error)
         elif isinstance(error, APIError):
             api_response_callback(error.request, error.body, error)
