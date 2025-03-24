@@ -13,7 +13,7 @@ RUN echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/operative && \
     chmod 440 /etc/sudoers.d/operative
 
 # Ensure home directory exists with proper permissions
-RUN mkdir -p $HOME && chown -R $(id -u ${USERNAME}):$(id -g ${USERNAME}) $HOME
+RUN mkdir -p $HOME && chown -R $USERNAME $HOME
 
 # Ensure tint2 config exists
 RUN mkdir -p $HOME/.config/tint2 && \
@@ -28,8 +28,9 @@ ENV UV_PYTHON_VERSION_MINOR=12
 ENV UV_PYTHON_VERSION_PATCH=7
 ENV UV_PYTHON_VERSION=$UV_PYTHON_VERSION_MAJOR.$UV_PYTHON_VERSION_MINOR.$UV_PYTHON_VERSION_PATCH
 
-# Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
+# Install uv with proper permissions
+RUN mkdir -p $HOME/.local/bin $HOME/.config/fish/conf.d && \
+    curl -LsSf https://astral.sh/uv/install.sh | sh && \
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 
 ENV PATH="$HOME/.local/bin:$PATH"
