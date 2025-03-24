@@ -19,6 +19,8 @@ RUN mkdir -p $HOME && chown -R $USERNAME $HOME
 RUN mkdir -p $HOME/.config/tint2 && \
     cp /etc/xdg/tint2/tint2rc $HOME/.config/tint2/tint2rc
 
+RUN chown -R $USERNAME:$USERNAME $HOME/.config
+
 USER ${USERNAME}
 WORKDIR $HOME
 
