@@ -10,5 +10,5 @@ export DISPLAY=:${DISPLAY_NUM:-1}
 ./x11vnc_startup.sh
 
 # Start MCP servers
-echo "Starting MCP servers..."
-/opt/mcp-servers/start_mcp_servers.sh &
+echo "Starting Hanzo MCP"
+./hanzo-mcp.sh

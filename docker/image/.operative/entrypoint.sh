@@ -6,7 +6,6 @@ cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 # Then start the UI components
 ./start_all.sh
 ./novnc_startup.sh
-./hanzo-mcp.sh
 
 # Use project venv
 source ~/.operative/.venv/bin/activate
