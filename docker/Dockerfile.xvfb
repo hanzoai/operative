@@ -268,11 +268,11 @@ RUN npm install -g hanzo-ai/hanzo-dev-mcp
 RUN echo '#!/bin/bash
 
 # Start MCP servers
-hanzo-dev-mcp &
-modelcontextprotocol-server-filesystem &
-modelcontextprotocol-server-git &
-mcp-server-commands &
-mcp-text-editor &
+/usr/local/bin/hanzo-dev-mcp &
+/usr/local/bin/modelcontextprotocol-server-filesystem &
+/usr/local/bin/modelcontextprotocol-server-git &
+/usr/local/bin/mcp-server-commands &
+/usr/local/bin/mcp-text-editor &
 
 echo "MCP servers started successfully"' > /opt/mcp-servers/start_mcp_servers.sh
 
