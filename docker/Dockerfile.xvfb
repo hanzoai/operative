@@ -30,8 +30,8 @@ RUN apt-get update && \
     python3.13 \
     python3.13-dev \
     python3.13-venv \
-    python3.13-distutils \
-    python3.13-pip \
+    python3-distutils \
+    python3-pip \
     libssl-dev \
     zlib1g-dev \
     libbz2-dev \
