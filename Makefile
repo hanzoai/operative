@@ -63,14 +63,27 @@ run-xvfb:
 
 # Testing targets
 install-dev:
-	uv venv --python=python3.12 .venv
-	. .venv/bin/activate && uv pip install -e ".[dev]"
-	. .venv/bin/activate && pre-commit install
+	if command -v uv > /dev/null; then \
+		uv venv --python=python3.12 .venv && \
+		. .venv/bin/activate && uv pip install -e ".[dev]" && \
+		. .venv/bin/activate && pre-commit install; \
+	else \
+		python -m venv .venv && \
+		. .venv/bin/activate && pip install -e ".[dev]" && \
+		. .venv/bin/activate && pip install pre-commit && \
+		. .venv/bin/activate && pre-commit install; \
+	fi
 
 install-test:
-	uv venv --python=python3.12 .venv
-	. .venv/bin/activate && uv pip install -e ".[test]"
-	. .venv/bin/activate && uv pip install anthropic>=0.22.0 streamlit>=1.31.0 httpx>=0.27.0
+	if command -v uv > /dev/null; then \
+		uv venv --python=python3.12 .venv && \
+		. .venv/bin/activate && uv pip install -e ".[test]" && \
+		. .venv/bin/activate && uv pip install anthropic>=0.22.0 streamlit>=1.31.0 httpx>=0.27.0; \
+	else \
+		python -m venv .venv && \
+		. .venv/bin/activate && pip install -e ".[test]" && \
+		. .venv/bin/activate && pip install anthropic>=0.22.0 streamlit>=1.31.0 httpx>=0.27.0; \
+	fi
 
 test:
 	. .venv/bin/activate && python -m pytest tests/

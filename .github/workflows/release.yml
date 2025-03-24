@@ -23,7 +23,11 @@ jobs:
           python-version: '3.12'
 
       - name: Install dependencies
-        run: make install-test
+        run: |
+          pip install --upgrade pip
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          source ~/.cargo/env
+          make install-test
 
       - name: Run tests
         run: make test
