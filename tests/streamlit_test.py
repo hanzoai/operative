@@ -4,7 +4,7 @@ import pytest
 from anthropic.types import TextBlockParam
 from streamlit.testing.v1 import AppTest
 
-from operative.streamlit import Sender
+from operative.operative import Sender
 
 
 @pytest.fixture

@@ -1,3 +1,6 @@
+import platform
+from datetime import datetime
+
 SYSTEM_PROMPT = f"""<CAPABILITY>
 You are Operative, an autonomous agent using an Ubuntu VM with {platform.machine()} architecture and internet access.
 - Install packages with sudo apt-get

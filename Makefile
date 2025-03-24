@@ -70,12 +70,13 @@ install-dev:
 install-test:
 	uv venv --python=python3.12 .venv
 	. .venv/bin/activate && uv pip install -e ".[test]"
+	. .venv/bin/activate && uv pip install anthropic>=0.22.0 streamlit>=1.31.0 httpx>=0.27.0
 
 test:
-	python3 -m pytest tests/
+	. .venv/bin/activate && python -m pytest tests/
 
 test-cov:
-	python3 -m pytest tests/ --cov=operative --cov-report=term-missing
+	. .venv/bin/activate && python -m pytest tests/ --cov=operative --cov-report=term-missing
 
 lint:
 	ruff check operative/ tests/
