@@ -1,0 +1,129 @@
+name: Operative Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          xvfb \
+          x11vnc \
+          fluxbox \
+          chromium-browser \
+          firefox
+          
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt', '**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+        pip install pytest pytest-asyncio pytest-cov pytest-xvfb
+        
+    - name: Lint with ruff
+      run: |
+        pip install ruff
+        ruff check . || true
+        
+    - name: Type check with mypy
+      run: |
+        pip install mypy
+        mypy . --ignore-missing-imports || true
+        
+    - name: Run unit tests
+      run: |
+        pytest tests/unit/ -v --cov=operative --cov-report=xml
+        
+    - name: Run integration tests (headless)
+      run: |
+        xvfb-run -a pytest tests/integration/ -v --browser=chromium
+        
+    - name: Test safety checks
+      run: |
+        # Test that safety checks work
+        python -c "from operative.safety import SafetyChecker; SafetyChecker().validate_action('click', {'element': 'button'})"
+        
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        
+  docker-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker image
+      run: |
+        docker build -t operative-test .
+        
+    - name: Test Docker container
+      run: |
+        # Start container with display
+        docker run -d \
+          --name operative-test \
+          -e DISPLAY=:99 \
+          -e VNC_PASSWORD=test123 \
+          -p 5900:5900 \
+          -p 6080:6080 \
+          operative-test
+          
+        # Wait for startup
+        sleep 10
+        
+        # Check if VNC is accessible
+        nc -zv localhost 5900 || exit 1
+        
+        # Cleanup
+        docker stop operative-test
+        docker rm operative-test
+        
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
