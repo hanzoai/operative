@@ -85,7 +85,10 @@ jobs:
       
     - name: Build Docker image
       run: |
-        docker build -f docker/Dockerfile -t operative-test .
+        # First build the base xvfb image
+        docker build -f docker/Dockerfile.xvfb -t operative-xvfb .
+        # Then build the main image using the local base
+        docker build -f docker/Dockerfile --build-arg BASE_IMAGE=operative-xvfb -t operative-test .
         
     - name: Test Docker container
       run: |
