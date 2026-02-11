@@ -228,8 +228,10 @@ RUN curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linu
         ln -s /opt/nvim/nvim /usr/local/bin/nvim; \
     fi
 
-# Setup SpaceVim
-RUN curl -sLf https://spacevim.org/install.sh | bash
+# Setup SpaceVim (skip if install script unavailable)
+RUN curl -sLf https://spacevim.org/install.sh -o /tmp/spacevim-install.sh && \
+    head -1 /tmp/spacevim-install.sh | grep -q '^#!' && bash /tmp/spacevim-install.sh || \
+    echo "SpaceVim install script unavailable, skipping"
 
 # Install dependencies for Emacs
 RUN apt-get update && apt-get install -y emacs git
