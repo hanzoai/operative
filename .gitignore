@@ -35,3 +35,11 @@ dev.md
 
 # OS specific files
 .DS_Store
+
+
+
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+GROK.md
+QWEN.md
