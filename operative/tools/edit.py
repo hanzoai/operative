@@ -99,7 +99,7 @@ class EditTool20250124(BaseTool):
                 f"File already exists at: {path}. Cannot overwrite files using command `create`."
             )
         # Check if the path points to a directory
-        if await asyncio.to_thread(path.is_dir):
+        if path.is_dir():
             if command != "view":
                 raise ToolError(
                     f"The path {path} is a directory and only the `view` command can be used on directories"
