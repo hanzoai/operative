@@ -4,7 +4,6 @@ Entrypoint for Operative using the modern AsyncAnthropic client and a UI for con
 import asyncio
 import base64
 import os
-import subprocess
 import sys
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -14,21 +13,21 @@ from functools import partial
 from pathlib import PosixPath
 from typing import cast, get_args
 
-import httpx
-import streamlit as st
-from anthropic.types.beta import (
+# Ensure we have the operative package on our PYTHONPATH
+_parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, _parent_dir)
+
+import httpx  # noqa: E402
+import streamlit as st  # noqa: E402
+from anthropic.types.beta import (  # noqa: E402
     BetaContentBlockParam,
     BetaTextBlockParam,
     BetaToolResultBlockParam,
 )
-from streamlit.delta_generator import DeltaGenerator
+from streamlit.delta_generator import DeltaGenerator  # noqa: E402
 
-# Ensure we have the operative package on our PYTHONPATH
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, parent_dir)
-
-from operative.loop import APIProvider, sampling_loop
-from operative.tools import ToolResult, ToolVersion
+from operative.loop import APIProvider, sampling_loop  # noqa: E402
+from operative.tools import ToolResult, ToolVersion  # noqa: E402
 
 PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
     APIProvider.ANTHROPIC: "claude-3-7-sonnet-20250219",
@@ -213,9 +212,11 @@ async def main():
             with st.spinner("Resetting..."):
                 st.session_state.clear()
                 setup_state()
-                subprocess.run("pkill Xvfb; pkill tint2", shell=True)
+                proc = await asyncio.create_subprocess_shell("pkill Xvfb; pkill tint2")
+                await proc.wait()
                 await asyncio.sleep(1)
-                subprocess.run("./start_all.sh", shell=True)
+                proc = await asyncio.create_subprocess_shell("./start_all.sh")
+                await proc.wait()
 
     if not st.session_state.auth_validated:
         if auth_error := validate_auth(st.session_state.provider, st.session_state.api_key):
