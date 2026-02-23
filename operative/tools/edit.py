@@ -1,3 +1,4 @@
+import asyncio
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Literal, get_args
@@ -98,7 +99,7 @@ class EditTool20250124(BaseTool):
                 f"File already exists at: {path}. Cannot overwrite files using command `create`."
             )
         # Check if the path points to a directory
-        if path.is_dir():
+        if await asyncio.to_thread(path.is_dir):
             if command != "view":
                 raise ToolError(
                     f"The path {path} is a directory and only the `view` command can be used on directories"
@@ -106,7 +107,7 @@ class EditTool20250124(BaseTool):
 
     async def view(self, path: Path, view_range: list[int] | None = None):
         """Implement the view command"""
-        if path.is_dir():
+        if await asyncio.to_thread(path.is_dir):
             if view_range:
                 raise ToolError(
                     "The `view_range` parameter is not allowed when `path` points to a directory."

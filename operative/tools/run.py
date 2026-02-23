@@ -17,7 +17,7 @@ def maybe_truncate(content: str, truncate_after: int | None = MAX_RESPONSE_LEN):
 
 async def run(
     cmd: str,
-    timeout: float | None = 120.0,  # seconds
+    timeout_seconds: float | None = 120.0,
     truncate_after: int | None = MAX_RESPONSE_LEN,
 ):
     """Run a shell command asynchronously with a timeout."""
@@ -26,17 +26,17 @@ async def run(
     )
 
     try:
-        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout_seconds)
         return (
             process.returncode or 0,
             maybe_truncate(stdout.decode(), truncate_after=truncate_after),
             maybe_truncate(stderr.decode(), truncate_after=truncate_after),
         )
-    except asyncio.TimeoutError as exc:
+    except TimeoutError as exc:
         try:
             process.kill()
         except ProcessLookupError:
             pass
         raise TimeoutError(
-            f"Command '{cmd}' timed out after {timeout} seconds"
+            f"Command '{cmd}' timed out after {timeout_seconds} seconds"
         ) from exc
