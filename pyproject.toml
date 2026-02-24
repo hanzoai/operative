@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hanzo-operative"
+name = "hanzo-operator"
 version = "0.1.1"
-description = "Hanzo Operative — autonomous agent using Anthropic Claude API with containerized environment"
+description = "Hanzo Operator — desktop automation agent with VNC and Streamlit sidecar"
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
