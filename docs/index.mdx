@@ -1,0 +1,403 @@
+---
+title: Hanzo Operative
+description: Computer-use automation service that enables Claude to interact with a full desktop environment via screenshot capture, mouse/keyboard control, bash execution, and file editing tools.
+---
+
+# Hanzo Operative
+
+Hanzo Operative is a computer-use automation service built on Anthropic's Claude computer use capability. It provides a containerized Ubuntu desktop environment where Claude can see the screen, move the mouse, type on the keyboard, run shell commands, and edit files -- enabling full autonomous interaction with any GUI or CLI application.
+
+**Endpoint:** `operative.hanzo.ai`
+**Gateway:** `api.hanzo.ai/v1/operative/*`
+**Image:** `ghcr.io/hanzoai/operative:latest`
+**Source:** [github.com/hanzoai/operative](https://github.com/hanzoai/operative)
+
+## Features
+
+- **Screen capture and analysis** -- Claude takes screenshots and reasons about what it sees on screen, identifying UI elements, reading text, and understanding layout
+- **Mouse control** -- Click (left, right, middle, double, triple), drag, scroll in all directions, mouse down/up for complex interactions
+- **Keyboard control** -- Type text, press key combinations, hold keys for duration-based actions
+- **Bash execution** -- Run arbitrary shell commands with a persistent bash session, 120-second timeout, and automatic output truncation
+- **File editing** -- View, create, string-replace, insert, and undo edits on files with history tracking
+- **Coordinate scaling** -- Automatic resolution scaling between the actual display and model-optimal XGA/WXGA targets
+- **Prompt caching** -- Efficient token usage via Anthropic prompt caching on the 3 most recent conversation turns
+- **Extended thinking** -- Claude 3.7 Sonnet support with configurable thinking budgets up to 128K output tokens
+- **Streaming responses** -- Real-time streaming of text, thinking, and tool-use events via the Anthropic beta streaming API
+- **Multi-provider auth** -- Direct Anthropic API, AWS Bedrock, and Google Cloud Vertex AI
+
+## Architecture
+
+Operative runs as a Docker container that bundles a full Ubuntu 22.04 desktop environment with Claude's agent loop.
+
+```
+User --> Streamlit UI (8501) --> Agent Sampling Loop --> Claude API
+              |                        |
+              |                        +-- ComputerTool (screenshot/mouse/keyboard via xdotool)
+              |                        +-- BashTool (persistent shell session)
+              |                        +-- EditTool (file view/create/replace/insert/undo)
+              |
+         HTTP Proxy (8080) --> Combined app + desktop view
+              |
+         noVNC (6080) --> X11/Xvfb + mutter + tint2
+              |
+         VNC (5900) --> Direct VNC client access
+```
+
+### Core Modules
+
+| Module | Purpose |
+|--------|---------|
+| `operative/operative.py` | Streamlit UI entrypoint with chat interface, sidebar config, and message rendering |
+| `operative/loop.py` | Async agent sampling loop -- calls Claude API, processes tool calls, manages conversation |
+| `operative/prompt.py` | System prompt defining Operative's capabilities, priorities, and safety constraints |
+| `operative/tools/computer.py` | Screen interaction via xdotool -- screenshots, mouse, keyboard, coordinate scaling |
+| `operative/tools/bash.py` | Persistent bash session with sentinel-based output capture and timeout handling |
+| `operative/tools/edit.py` | File operations -- view, create, str_replace, insert, undo_edit with history |
+| `operative/tools/collection.py` | Tool registry that maps tool names to implementations and dispatches calls |
+| `operative/tools/groups.py` | Tool versioning -- groups tools by API version with corresponding beta flags |
+| `operative/tools/run.py` | Async shell command runner with timeout and output truncation |
+| `operative/tools/base.py` | Base classes -- `BaseTool`, `ToolResult`, `CLIResult`, `ToolError` |
+
+### Tool Versions
+
+Operative supports two tool API versions, matching Anthropic's computer use beta releases:
+
+| Version | Beta Flag | Models | Capabilities |
+|---------|-----------|--------|-------------|
+| `computer_use_20241022` | `computer-use-2024-10-22` | Claude 3.5 Sonnet | Basic mouse, keyboard, screenshot, cursor position |
+| `computer_use_20250124` | `computer-use-2025-01-24` | Claude 3.7 Sonnet | Adds scroll, mouse down/up, hold_key, wait, triple_click |
+
+### Container Stack
+
+The Docker image is built in two layers:
+
+1. **`ghcr.io/hanzoai/xvfb`** -- Ubuntu 22.04 base with Xvfb, mutter, tint2, x11vnc, noVNC, xdotool, scrot, ImageMagick, Python 3.13, development tools (ripgrep, fd, jq, fzf, bat, tmux), databases (PostgreSQL, MariaDB, Redis, SQLite3), and Docker-in-Docker
+2. **`ghcr.io/hanzoai/operative`** -- Adds the `operative` user, uv-managed Python venv, pip dependencies (`anthropic`, `streamlit`, `httpx`), and the operative application code
+
+### Ports
+
+| Port | Service | Description |
+|------|---------|-------------|
+| 5900 | VNC | Direct VNC protocol access for VNC clients |
+| 6080 | noVNC | Browser-based VNC viewer at `/vnc.html` |
+| 8080 | HTTP | Combined interface (agent chat + desktop view) |
+| 8501 | Streamlit | Operative chat UI only |
+
+## Quick Start
+
+### Run with Docker (Anthropic API)
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+
+docker run \
+    -e ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+    -v $HOME/.anthropic:/home/operative/.anthropic \
+    -p 5900:5900 \
+    -p 8501:8501 \
+    -p 6080:6080 \
+    -p 8080:8080 \
+    -it ghcr.io/hanzoai/operative:latest
+```
+
+Open [http://localhost:8080](http://localhost:8080) for the combined interface, or [http://localhost:8501](http://localhost:8501) for the chat UI alone.
+
+### Run with AWS Bedrock
+
+```bash
+export AWS_PROFILE=your-profile
+
+docker run \
+    -e API_PROVIDER=bedrock \
+    -e AWS_PROFILE=$AWS_PROFILE \
+    -e AWS_REGION=us-west-2 \
+    -v $HOME/.aws:/home/operative/.aws \
+    -v $HOME/.anthropic:/home/operative/.anthropic \
+    -p 5900:5900 -p 8501:8501 -p 6080:6080 -p 8080:8080 \
+    -it ghcr.io/hanzoai/operative:latest
+```
+
+### Run with Google Cloud Vertex AI
+
+```bash
+gcloud auth application-default login
+export VERTEX_REGION=us-central1
+export VERTEX_PROJECT_ID=your-project-id
+
+docker run \
+    -e API_PROVIDER=vertex \
+    -e CLOUD_ML_REGION=$VERTEX_REGION \
+    -e ANTHROPIC_VERTEX_PROJECT_ID=$VERTEX_PROJECT_ID \
+    -v $HOME/.config/gcloud/application_default_credentials.json:/home/operative/.config/gcloud/application_default_credentials.json \
+    -p 5900:5900 -p 8501:8501 -p 6080:6080 -p 8080:8080 \
+    -it ghcr.io/hanzoai/operative:latest
+```
+
+### Via Hanzo API
+
+```bash
+curl -X POST https://api.hanzo.ai/v1/operative/sessions \
+  -H "Authorization: Bearer hk-your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "task": "Open Firefox, navigate to hanzo.ai, and take a screenshot",
+    "model": "claude-3-7-sonnet-20250219",
+    "thinking_budget": 64000
+  }'
+```
+
+## Browser Automation
+
+Operative excels at browser-based tasks. Claude sees the screen via screenshots and interacts using mouse/keyboard tools.
+
+### Example: Form Filling
+
+```python
+import anthropic
+from operative.loop import sampling_loop, APIProvider
+from operative.tools import ToolVersion
+
+messages = [
+    {
+        "role": "user",
+        "content": [
+            {
+                "type": "text",
+                "text": (
+                    "Open Firefox and navigate to example.com/signup. "
+                    "Fill in the form with: name='Test User', "
+                    "email='test@example.com'. Click Submit."
+                )
+            }
+        ]
+    }
+]
+
+result = await sampling_loop(
+    model="claude-3-7-sonnet-20250219",
+    provider=APIProvider.ANTHROPIC,
+    system_prompt_suffix="Complete the form carefully.",
+    messages=messages,
+    output_callback=lambda block: print(block),
+    tool_output_callback=lambda result, tid: None,
+    api_response_callback=lambda req, resp, err: None,
+    api_key="sk-ant-...",
+    only_n_most_recent_images=3,
+    max_tokens=128000,
+    tool_version="computer_use_20250124",
+    thinking_budget=64000,
+)
+```
+
+### Example: Web Scraping with AI Understanding
+
+```python
+messages = [
+    {
+        "role": "user",
+        "content": [
+            {
+                "type": "text",
+                "text": (
+                    "Navigate to news.ycombinator.com. "
+                    "Read the top 5 stories and save their titles "
+                    "and URLs to /tmp/hn_top5.json as a JSON array."
+                )
+            }
+        ]
+    }
+]
+```
+
+Claude will open Firefox, read the page visually, extract data, and write structured output using the bash or edit tools.
+
+## Task Workflows
+
+The agent sampling loop implements a turn-based workflow:
+
+1. **User sends a task** -- natural language instruction appended to messages
+2. **Claude reasons** -- analyzes the task, plans steps (optionally with extended thinking)
+3. **Claude calls tools** -- issues `computer`, `bash`, or `str_replace_editor` tool calls
+4. **Tools execute** -- Operative runs the tool and returns output/screenshots
+5. **Claude observes results** -- reviews tool output and screenshots
+6. **Loop continues** -- Claude calls more tools or returns a final text response
+
+### Interruption Handling
+
+Users can interrupt a running task at any time. When interrupted:
+- All pending tool calls receive an error result (`"human stopped or interrupted tool execution"`)
+- The new user message is injected with interruption context
+- Claude acknowledges the interruption and processes the new instruction
+
+### Token Optimization
+
+- **Image filtering** -- Only the N most recent screenshots are sent to the model (configurable via `only_n_most_recent_images`), reducing token usage as conversations grow
+- **Prompt caching** -- The 3 most recent user turns get cache breakpoints, with one reserved for tools/system prompt
+- **Token-efficient tools beta** -- Optional `token-efficient-tools-2025-02-19` flag reduces tool definition token overhead
+- **Output truncation** -- Tool output is capped at 16,000 characters to prevent context overflow
+
+## API Reference
+
+### Sampling Loop
+
+The core function that drives the agent:
+
+```python
+async def sampling_loop(
+    *,
+    model: str,                          # e.g. "claude-3-7-sonnet-20250219"
+    provider: APIProvider,               # "anthropic", "bedrock", or "vertex"
+    system_prompt_suffix: str,           # Appended to the system prompt
+    messages: list[dict],                # Conversation history
+    output_callback: Callable,           # Receives streaming content blocks
+    tool_output_callback: Callable,      # Receives tool results
+    api_response_callback: Callable,     # Receives HTTP request/response pairs
+    api_key: str,                        # Anthropic API key
+    only_n_most_recent_images: int | None = None,
+    max_tokens: int = 4096,              # Max output tokens (up to 128000)
+    tool_version: ToolVersion,           # "computer_use_20250124" or "computer_use_20241022"
+    thinking_budget: int | None = None,  # Thinking token budget (Claude 3.7+)
+    token_efficient_tools_beta: bool = False,
+) -> list[dict]:
+```
+
+### Computer Tool Actions
+
+**Version 20241022 (Claude 3.5 Sonnet):**
+
+| Action | Parameters | Description |
+|--------|-----------|-------------|
+| `screenshot` | -- | Capture current screen as base64 PNG |
+| `cursor_position` | -- | Get current mouse X,Y coordinates |
+| `mouse_move` | `coordinate` | Move mouse to (x, y) |
+| `left_click` | -- | Left mouse click at current position |
+| `right_click` | -- | Right mouse click |
+| `middle_click` | -- | Middle mouse click |
+| `double_click` | -- | Double left click |
+| `left_click_drag` | `coordinate` | Click-drag to (x, y) |
+| `key` | `text` | Press key combination (e.g. `"ctrl+c"`) |
+| `type` | `text` | Type text string with 12ms delay between groups |
+
+**Version 20250124 additions (Claude 3.7 Sonnet):**
+
+| Action | Parameters | Description |
+|--------|-----------|-------------|
+| `triple_click` | `coordinate?`, `key?` | Triple click with optional modifier |
+| `scroll` | `scroll_direction`, `scroll_amount`, `coordinate?` | Scroll up/down/left/right |
+| `left_mouse_down` | -- | Press and hold left mouse button |
+| `left_mouse_up` | -- | Release left mouse button |
+| `hold_key` | `text`, `duration` | Hold a key for N seconds |
+| `wait` | `duration` | Wait N seconds, then screenshot |
+
+### Bash Tool
+
+```python
+await bash_tool(command="ls -la /tmp")     # Run a command
+await bash_tool(restart=True)               # Restart the bash session
+```
+
+- Persistent session across calls (state is preserved)
+- 120-second timeout per command
+- Output truncated at 16,000 characters
+- Sentinel-based output capture (no EOF waiting)
+
+### Edit Tool Commands
+
+| Command | Parameters | Description |
+|---------|-----------|-------------|
+| `view` | `path`, `view_range?` | View file contents or directory listing (2 levels deep) |
+| `create` | `path`, `file_text` | Create a new file (fails if file exists) |
+| `str_replace` | `path`, `old_str`, `new_str?` | Replace exact string match (must be unique) |
+| `insert` | `path`, `insert_line`, `new_str` | Insert text at a specific line number |
+| `undo_edit` | `path` | Revert to previous file version from history |
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ANTHROPIC_API_KEY` | -- | Anthropic API key (required for direct API) |
+| `API_PROVIDER` | `anthropic` | Provider: `anthropic`, `bedrock`, or `vertex` |
+| `WIDTH` | `1280` | Screen width in pixels |
+| `HEIGHT` | `800` | Screen height in pixels |
+| `DISPLAY_NUM` | `1` | X11 display number |
+| `SHOW_WARNING` | `True` | Show security warning banner |
+| `AWS_PROFILE` | -- | AWS profile for Bedrock auth |
+| `AWS_REGION` | -- | AWS region for Bedrock |
+| `CLOUD_ML_REGION` | -- | Google Cloud region for Vertex |
+| `ANTHROPIC_VERTEX_PROJECT_ID` | -- | GCP project ID for Vertex |
+
+### Screen Resolution
+
+The recommended resolution is XGA (1024x768). For higher resolutions, Operative automatically scales screenshots down and maps coordinates back. Supported scaling targets:
+
+| Target | Resolution | Aspect Ratio |
+|--------|-----------|-------------|
+| XGA | 1024x768 | 4:3 |
+| WXGA | 1280x800 | 16:10 |
+| FWXGA | 1366x768 | ~16:9 |
+
+### MCP Servers (In-Container)
+
+The container ships with pre-configured MCP servers:
+
+| Server | Purpose |
+|--------|---------|
+| `hanzo-dev-mcp` | Primary Hanzo development environment (port 9051) |
+| `modelcontextprotocol-server-filesystem` | File access MCP |
+| `modelcontextprotocol-server-git` | Git operations MCP |
+| `mcp-server-commands` | Shell command MCP |
+| `mcp-text-editor` | Text editing MCP |
+
+### System Prompt
+
+The built-in system prompt configures Operative as an autonomous Ubuntu VM agent with these priorities:
+
+1. CLI tools and MCP servers (preferred)
+2. Text-based interfaces
+3. Scripting
+4. GUI only as last resort
+
+Safety constraints include never running destructive `rm -rf` commands, verifying services before use, and using `curl` over `wget`.
+
+## Development
+
+### Local Setup
+
+```bash
+cd ~/work/hanzo/operative
+
+# Setup Python environment
+make setup
+
+# Run tests
+make test
+
+# Run with coverage
+make test-cov
+
+# Lint and format
+make lint
+make format
+```
+
+### Development Mode (Hot Reload)
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+
+make dev
+# Mounts local ./operative/ into the container for live editing
+```
+
+### Building Images
+
+```bash
+make build-xvfb    # Build base Xvfb image
+make build          # Build operative image (depends on xvfb)
+make build-desktop  # Build full desktop variant
+
+make push           # Push operative to GHCR
+make push-desktop   # Push desktop variant to GHCR
+```
