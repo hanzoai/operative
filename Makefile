@@ -6,7 +6,7 @@ setup:
 	@if ! command -v uv &> /dev/null; then \
 		curl -LsSf https://astral.sh/uv/install.sh | sh; \
 	fi
-	uv venv --python=python3.13 .venv
+	uv venv --python=python3.14 .venv
 	. .venv/bin/activate && uv pip install -r requirements.txt
 	. .venv/bin/activate && uv pip install pre-commit watchdog
 	. .venv/bin/activate && pre-commit install
@@ -64,7 +64,7 @@ run-xvfb:
 # Testing targets
 install-dev:
 	if command -v uv > /dev/null; then \
-		uv venv --python=python3.13 .venv && \
+		uv venv --python=python3.14 .venv && \
 		. .venv/bin/activate && uv pip install -e ".[dev]" && \
 		. .venv/bin/activate && pre-commit install; \
 	else \
@@ -76,7 +76,7 @@ install-dev:
 
 install-test:
 	if command -v uv > /dev/null; then \
-		uv venv --python=python3.13 .venv && \
+		uv venv --python=python3.14 .venv && \
 		. .venv/bin/activate && uv pip install -e ".[test]" && \
 		. .venv/bin/activate && uv pip install anthropic>=0.49.0 streamlit>=1.43.0 httpx>=0.28.0; \
 	else \
