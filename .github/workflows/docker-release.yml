@@ -17,5 +17,7 @@ jobs:
       image: ghcr.io/hanzoai/operative
       context: .
       dockerfile: docker/Dockerfile
-
+      deploy: true
+      deploy-deployment: visor
+      deploy-namespace: hanzo
     secrets: inherit
