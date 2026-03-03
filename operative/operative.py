@@ -177,12 +177,11 @@ async def main():
                 st.session_state.provider = st.session_state.provider_radio
                 st.session_state.auth_validated = False
 
-        provider_options = [p.value for p in APIProvider]
         st.radio(
             "API Provider",
-            options=provider_options,
+            options=list(APIProvider),
             key="provider_radio",
-            format_func=lambda x: x.title(),
+            format_func=lambda x: x.value.title(),
             on_change=_reset_api_provider,
         )
 
