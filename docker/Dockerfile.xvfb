@@ -27,10 +27,10 @@ RUN apt-get update && \
     mutter \
     x11vnc \
     build-essential \
-    python3.13 \
-    python3.13-dev \
-    python3.13-venv \
-    python3.13-stdlib \
+    python3.14 \
+    python3.14-dev \
+    python3.14-venv \
+    python3.14-stdlib \
     libssl-dev \
     zlib1g-dev \
     libbz2-dev \
@@ -199,14 +199,14 @@ RUN echo "deb [signed-by=/etc/apt/keyrings/charm.gpg] https://repo.charm.sh/apt/
 RUN sudo apt update && sudo apt install glow
 
 # Create symlinks for python/python3
-RUN sudo ln -sf /usr/bin/python3.13 /usr/local/bin/python && \
-    sudo ln -sf /usr/bin/python3.13 /usr/local/bin/python3
+RUN sudo ln -sf /usr/bin/python3.14 /usr/local/bin/python && \
+    sudo ln -sf /usr/bin/python3.14 /usr/local/bin/python3
 
 # Python and Machine Learning essentials - PyTorch, Jupyter, NumPy, Pandas, etc.
-RUN python3.13 -m ensurepip && \
-    python3.13 -m pip install --upgrade pip setuptools wheel && \
-    python3.13 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
-    python3.13 -m pip install hanzo-mcp jupyterlab notebook numpy pandas scikit-learn matplotlib seaborn plotly tqdm transformers datasets ipywidgets
+RUN python3.14 -m ensurepip && \
+    python3.14 -m pip install --upgrade pip setuptools wheel && \
+    python3.14 -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    python3.14 -m pip install hanzo-mcp jupyterlab notebook numpy pandas scikit-learn matplotlib seaborn plotly tqdm transformers datasets ipywidgets
 
 # Install VS Code
 RUN wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > packages.microsoft.gpg
