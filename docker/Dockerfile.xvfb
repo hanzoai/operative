@@ -105,12 +105,12 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
 # Install PHP
 RUN sudo apt-get install -y php php-cli php-fpm php-json php-common php-mysql php-zip php-gd php-mbstring php-curl php-xml php-pear php-bcmath composer
 
-# Install .NET (for C#)
+# Install .NET (for C#) - non-fatal if Microsoft repo unavailable
 RUN wget https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
     sudo dpkg -i packages-microsoft-prod.deb && \
     rm packages-microsoft-prod.deb && \
     sudo apt-get update && \
-    sudo apt-get install -y dotnet-sdk-7.0
+    sudo apt-get install -y dotnet-sdk-8.0 || echo "WARN: .NET SDK install failed, skipping"
 
 # Install R (without RStudio Server which is problematic)
 RUN sudo apt-get install -y r-base r-base-dev
@@ -139,7 +139,7 @@ RUN ARCH=$(dpkg --print-architecture) && \
     sudo ln -s /usr/lib/dart-sdk/bin/dartaotruntime /usr/bin/dartaotruntime && \
     rm dartsdk-linux-*-release.zip
 
-# Install PowerShell
+# Install PowerShell - non-fatal if Microsoft repo unavailable
 RUN sudo apt-get install -y wget apt-transport-https software-properties-common && \
     ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "amd64" ]; then \
@@ -147,7 +147,7 @@ RUN sudo apt-get install -y wget apt-transport-https software-properties-common 
         sudo dpkg -i packages-microsoft-prod.deb && \
         rm packages-microsoft-prod.deb && \
         sudo apt-get update && \
-        sudo apt-get install -y powershell; \
+        sudo apt-get install -y powershell || echo "WARN: PowerShell install failed, skipping"; \
     else \
         echo "PowerShell is not available for $ARCH architecture, skipping"; \
     fi
