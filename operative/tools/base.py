@@ -32,7 +32,7 @@ class ToolResult:
     def __bool__(self):
         return any(getattr(self, field.name) for field in fields(self))
 
-    def __add__(self, other: "ToolResult"):
+    def __add__(self, other: ToolResult):
         def combine_fields(
             field: str | None, other_field: str | None, concatenate: bool = True
         ):
