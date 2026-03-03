@@ -77,8 +77,9 @@ RUN git clone --branch v1.6.0 https://github.com/novnc/noVNC.git /opt/noVNC && \
     ln -s /opt/noVNC/vnc.html /opt/noVNC/index.html
 
 # Install Colima for containerized dev environments
-RUN curl -LO https://github.com/abiosoft/colima/releases/latest/download/colima-linux-amd64 && \
-    install -m 755 colima-linux-amd64 /usr/local/bin/colima && rm colima-linux-amd64
+RUN ARCH=$(dpkg --print-architecture) && \
+    curl -LO https://github.com/abiosoft/colima/releases/latest/download/colima-linux-${ARCH} && \
+    install -m 755 colima-linux-${ARCH} /usr/local/bin/colima && rm colima-linux-${ARCH}
 
 # MongoDB official install
 RUN curl -fsSL https://pgp.mongodb.com/server-7.0.asc | gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg && \
@@ -214,17 +215,21 @@ RUN echo "deb [arch=amd64,arm64,armhf signed-by=/etc/apt/keyrings/packages.micro
 RUN sudo apt-get install apt-transport-https && sudo apt-get update && sudo apt-get install -y code
 
 # Download and install Neovim
-RUN curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage && \
-    chmod u+x nvim-linux-x86_64.appimage && \
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "amd64" ]; then \
+        NVIM_ARCH="x86_64"; \
+    else \
+        NVIM_ARCH="aarch64"; \
+    fi && \
+    curl -LO "https://github.com/neovim/neovim/releases/latest/download/nvim-linux-${NVIM_ARCH}.appimage" && \
+    chmod u+x "nvim-linux-${NVIM_ARCH}.appimage" && \
     mkdir -p /opt/nvim && \
-    # Try running directly first
-    ./nvim-linux-x86_64.appimage --appimage-extract || true && \
-    # If direct execution fails, use extracted version
+    ./"nvim-linux-${NVIM_ARCH}.appimage" --appimage-extract || true && \
     if [ -d "squashfs-root" ]; then \
         mv squashfs-root /opt/nvim/ && \
         ln -s /opt/nvim/squashfs-root/AppRun /usr/local/bin/nvim; \
     else \
-        mv nvim-linux-x86_64.appimage /opt/nvim/nvim && \
+        mv "nvim-linux-${NVIM_ARCH}.appimage" /opt/nvim/nvim && \
         ln -s /opt/nvim/nvim /usr/local/bin/nvim; \
     fi
 

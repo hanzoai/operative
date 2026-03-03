@@ -1,0 +1,21 @@
+name: Build xvfb Base Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'docker/Dockerfile.xvfb'
+
+concurrency:
+  group: xvfb-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  xvfb:
+    uses: hanzoai/.github/.github/workflows/docker-build.yml@main
+    with:
+      image: ghcr.io/hanzoai/xvfb
+      context: .
+      dockerfile: docker/Dockerfile.xvfb
+    secrets: inherit
