@@ -3,6 +3,7 @@ Agentic sampling loop that calls the Anthropic API using the modern AsyncAnthrop
 and its streaming interface for beta computer use.
 """
 
+import os
 from collections.abc import Callable
 from enum import StrEnum
 from typing import Any, cast
@@ -41,6 +42,7 @@ OUTPUT_128K_BETA_FLAG = "output-128k-2025-02-19"
 
 
 class APIProvider(StrEnum):
+    HANZO = "hanzo"
     ANTHROPIC = "anthropic"
     BEDROCK = "bedrock"
     VERTEX = "vertex"
@@ -79,7 +81,10 @@ async def sampling_loop(
 
     def get_api_client():
         """Get API client based on provider."""
-        if provider == APIProvider.ANTHROPIC:
+        if provider == APIProvider.HANZO:
+            base = os.environ.get("HANZO_API_BASE", "https://api.hanzo.ai")
+            return AsyncAnthropic(api_key=api_key, base_url=base, max_retries=4)
+        elif provider == APIProvider.ANTHROPIC:
             return AsyncAnthropic(api_key=api_key, max_retries=4)
         elif provider == APIProvider.VERTEX:
             return AsyncAnthropicVertex()
@@ -98,8 +103,8 @@ async def sampling_loop(
         return betas
 
     def configure_prompt_caching(system, betas):
-        """Configure prompt caching if using Anthropic API."""
-        if provider == APIProvider.ANTHROPIC:
+        """Configure prompt caching if using Anthropic API or Hanzo (Anthropic-compatible)."""
+        if provider in (APIProvider.ANTHROPIC, APIProvider.HANZO):
             betas.append(PROMPT_CACHING_BETA_FLAG)
             _inject_prompt_caching(messages)
             system["cache_control"] = {"type": "ephemeral"}  # type: ignore
@@ -246,7 +251,7 @@ async def sampling_loop(
         betas = get_beta_flags()
         system = configure_prompt_caching(system, betas)
 
-        image_limit = 0 if provider == APIProvider.ANTHROPIC else only_n_most_recent_images
+        image_limit = 0 if provider in (APIProvider.ANTHROPIC, APIProvider.HANZO) else only_n_most_recent_images
         if image_limit:
             _maybe_filter_to_n_most_recent_images(
                 messages, image_limit, min_removal_threshold=image_limit

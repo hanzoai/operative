@@ -18,4 +18,5 @@ jobs:
       image: ghcr.io/hanzoai/xvfb
       context: .
       dockerfile: docker/Dockerfile.xvfb
+      platforms: "linux/amd64"
     secrets: inherit

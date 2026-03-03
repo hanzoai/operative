@@ -17,6 +17,7 @@ jobs:
       image: ghcr.io/hanzoai/operative
       context: .
       dockerfile: docker/Dockerfile
+      platforms: "linux/amd64"
       deploy: true
       deploy-deployment: visor
       deploy-namespace: hanzo

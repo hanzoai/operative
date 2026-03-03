@@ -30,6 +30,7 @@ from operative.loop import APIProvider, sampling_loop  # noqa: E402
 from operative.tools import ToolResult, ToolVersion  # noqa: E402
 
 PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
+    APIProvider.HANZO: "claude-sonnet-4",
     APIProvider.ANTHROPIC: "claude-3-7-sonnet-20250219",
     APIProvider.BEDROCK: "anthropic.claude-3-5-sonnet-20241022-v2:0",
     APIProvider.VERTEX: "claude-3-5-sonnet-v2@20241022",
@@ -92,9 +93,24 @@ def setup_state():
     if "messages" not in st.session_state:
         st.session_state.messages = []
     if "api_key" not in st.session_state:
-        st.session_state.api_key = load_from_storage("api_key") or os.getenv("ANTHROPIC_API_KEY", "")
+        st.session_state.api_key = (
+            load_from_storage("api_key")
+            or os.getenv("HANZO_API_KEY", "")
+            or os.getenv("ANTHROPIC_API_KEY", "")
+            or os.getenv("OPENAI_API_KEY", "")
+        )
     if "provider" not in st.session_state:
-        st.session_state.provider = os.getenv("API_PROVIDER", "anthropic") or APIProvider.ANTHROPIC
+        # Default: all traffic routes through api.hanzo.ai for usage tracking,
+        # billing, and logging in console.hanzo.ai — even BYOK (Bring Your Own Key).
+        # Users can send Hanzo keys (hk-*), Anthropic keys (sk-ant-*), or OpenAI
+        # keys — api.hanzo.ai handles routing and adds billing premium on top.
+        # Only use direct Anthropic/Bedrock/Vertex when explicitly requested.
+        if os.getenv("API_PROVIDER"):
+            st.session_state.provider = os.getenv("API_PROVIDER")
+        elif os.getenv("HANZO_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY"):
+            st.session_state.provider = APIProvider.HANZO
+        else:
+            st.session_state.provider = APIProvider.HANZO
     if "provider_radio" not in st.session_state:
         st.session_state.provider_radio = st.session_state.provider
     if "model" not in st.session_state:
@@ -167,7 +183,14 @@ async def main():
 
         st.text_input("Model", key="model", on_change=_reset_model_conf)
 
-        if st.session_state.provider == APIProvider.ANTHROPIC:
+        if st.session_state.provider == APIProvider.HANZO:
+            st.text_input(
+                "Hanzo API Key",
+                type="password",
+                key="api_key",
+                on_change=lambda: save_to_storage("api_key", st.session_state.api_key),
+            )
+        elif st.session_state.provider == APIProvider.ANTHROPIC:
             st.text_input(
                 "Anthropic API Key",
                 type="password",
@@ -325,7 +348,10 @@ def track_sampling_loop():
 
 
 def validate_auth(provider: APIProvider, api_key: str | None):
-    if provider == APIProvider.ANTHROPIC:
+    if provider == APIProvider.HANZO:
+        if not api_key:
+            return "Please provide your Hanzo API key (HANZO_API_KEY) in the sidebar."
+    elif provider == APIProvider.ANTHROPIC:
         if not api_key:
             return "Please provide your Anthropic API key in the sidebar."
     if provider == APIProvider.BEDROCK:
