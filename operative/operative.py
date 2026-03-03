@@ -30,7 +30,7 @@ from operative.loop import APIProvider, sampling_loop  # noqa: E402
 from operative.tools import ToolResult, ToolVersion  # noqa: E402
 
 PROVIDER_TO_DEFAULT_MODEL_NAME: dict[APIProvider, str] = {
-    APIProvider.HANZO: "claude-sonnet-4",
+    APIProvider.HANZO: "zen4-pro",
     APIProvider.ANTHROPIC: "claude-3-7-sonnet-20250219",
     APIProvider.BEDROCK: "anthropic.claude-3-5-sonnet-20241022-v2:0",
     APIProvider.VERTEX: "claude-3-5-sonnet-v2@20241022",
@@ -105,10 +105,12 @@ def setup_state():
         # Users can send Hanzo keys (hk-*), Anthropic keys (sk-ant-*), or OpenAI
         # keys — api.hanzo.ai handles routing and adds billing premium on top.
         # Only use direct Anthropic/Bedrock/Vertex when explicitly requested.
-        if os.getenv("API_PROVIDER"):
-            st.session_state.provider = os.getenv("API_PROVIDER")
-        elif os.getenv("HANZO_API_KEY") or os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY"):
-            st.session_state.provider = APIProvider.HANZO
+        env_provider = os.getenv("API_PROVIDER", "")
+        if env_provider:
+            try:
+                st.session_state.provider = APIProvider(env_provider)
+            except ValueError:
+                st.session_state.provider = APIProvider.HANZO
         else:
             st.session_state.provider = APIProvider.HANZO
     if "provider_radio" not in st.session_state:
@@ -142,7 +144,10 @@ def _reset_model():
 
 
 def _reset_model_conf():
-    if "3-7" in st.session_state.model:
+    # Zen models via api.hanzo.ai use the same capabilities as Sonnet 3.7
+    # (computer use, extended thinking, 128k output) — api.hanzo.ai handles
+    # the model routing transparently.
+    if "zen" in st.session_state.model or "3-7" in st.session_state.model:
         model_conf = SONNET_3_7
     else:
         model_conf = MODEL_TO_MODEL_CONF.get(st.session_state.model, SONNET_3_5_NEW)
