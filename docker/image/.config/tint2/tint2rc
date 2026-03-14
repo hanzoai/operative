@@ -1,6 +1,6 @@
 #-------------------------------------
 # Panel
-panel_items = TL
+panel_items = T
 panel_size = 100% 60
 panel_margin = 0 0
 panel_padding = 2 0 2
