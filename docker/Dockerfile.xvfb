@@ -28,6 +28,7 @@ RUN apt-get update && \
     imagemagick \
     mutter \
     x11vnc \
+    tigervnc-scraping-server \
     build-essential \
     python3.14 \
     python3.14-dev \
