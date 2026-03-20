@@ -22,7 +22,41 @@ jobs:
       context: .
       dockerfile: docker/Dockerfile
       platforms: "linux/amd64"
-      deploy: true
-      deploy-deployment: visor
-      deploy-namespace: hanzo
     secrets: inherit
+
+  dispatch-to-universe:
+    needs: docker
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Compute image tag
+        id: meta
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF#refs/tags/v}"
+          else
+            TAG="main"
+          fi
+          echo "image=ghcr.io/hanzoai/operative:${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch image update to universe
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.UNIVERSE_DISPATCH_TOKEN }}
+          repository: hanzoai/universe
+          event-type: image-update
+          client-payload: |
+            {
+              "service": "operative",
+              "image": "${{ steps.meta.outputs.image }}",
+              "sha": "${{ github.sha }}",
+              "repo": "${{ github.repository }}"
+            }
+
+      - name: Summary
+        run: |
+          echo "### Deploy dispatched to universe" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Image:** ${{ steps.meta.outputs.image }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Flow:** image-receiver -> dev branch -> staging deploy -> E2E -> PR to main -> production" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Track progress: https://github.com/hanzoai/universe/actions" >> "$GITHUB_STEP_SUMMARY"
