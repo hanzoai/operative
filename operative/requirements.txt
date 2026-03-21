@@ -1,7 +1,7 @@
-streamlit>=1.43.0
-anthropic[bedrock,vertex]>=0.84.0
-certifi>=2025.1.31
-jsonschema==4.23.0
+streamlit>=1.55.0
+anthropic[bedrock,vertex]>=0.86.0
+certifi>=2026.2.25
+jsonschema>=4.26.0
 pillow>=12.1.1
 boto3>=1.28.57
 google-auth<3,>=2
