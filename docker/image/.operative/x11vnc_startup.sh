@@ -8,6 +8,13 @@ echo "starting vnc"
 # x0vncserver uses TigerVNC's VNC implementation which speaks the
 # RFB protocol correctly (server sends version banner immediately).
 
+# Kill any stale VNC server from a previous run to avoid
+# "A VNC server is already running as :0" errors on restart.
+pkill -f "x0vncserver.*:5900" 2>/dev/null || true
+pkill -f "x11vnc.*:5900" 2>/dev/null || true
+rm -f /tmp/.X0-lock /tmp/.X11-unix/X0 2>/dev/null || true
+sleep 0.5
+
 VNC_CMD=""
 VNC_ARGS=""
 
