@@ -10,10 +10,13 @@ echo "starting vnc"
 
 # Kill any stale VNC server from a previous run to avoid
 # "A VNC server is already running as :0" errors on restart.
-pkill -f "x0vncserver.*:5900" 2>/dev/null || true
-pkill -f "x11vnc.*:5900" 2>/dev/null || true
-rm -f /tmp/.X0-lock /tmp/.X11-unix/X0 2>/dev/null || true
-sleep 0.5
+pkill -9 -f "x0vncserver" 2>/dev/null || true
+pkill -9 -f "x11vnc" 2>/dev/null || true
+# Wait for port 5900 to be released
+for i in $(seq 1 10); do
+    netstat -tuln 2>/dev/null | grep -q ":5900 " || break
+    sleep 0.5
+done
 
 VNC_CMD=""
 VNC_ARGS=""
